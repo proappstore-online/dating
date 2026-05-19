@@ -32,7 +32,7 @@ export default function Discover({ me, onMatched, onNavigate }: Props) {
           countAdmirers(me.userId),
         ])
         if (cancelled) return
-        setStack(candidates.reverse())
+        setStack([...candidates].reverse())
         setAdmirerCount(admirers)
       } catch (e) {
         if (!cancelled) setError((e as Error).message)

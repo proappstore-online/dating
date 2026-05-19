@@ -28,9 +28,11 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false
+    let off: (() => void) | null = null
     ;(async () => {
       await app.auth.init()
-      const off = app.auth.onChange(async (user: User | null) => {
+      if (cancelled) return
+      off = app.auth.onChange(async (user: User | null) => {
         if (cancelled) return
         if (!user) {
           setStage({ name: 'signin' })
@@ -59,9 +61,11 @@ export default function App() {
           if (!cancelled) setStage({ name: 'onboarding', user, dob: user.dateOfBirth, initial: null })
         }
       })
-      return () => off()
     })()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+      off?.()
+    }
   }, [])
 
   if (stage.name === 'booting') {

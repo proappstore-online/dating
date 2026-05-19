@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Room, RoomMessage } from '@proappstore/sdk'
 import { app } from './app'
 import type { Message, Profile } from '../types'
@@ -104,7 +104,10 @@ export function useRealtime(
         const a = activeRef.current
         if (a && keyOf(a.aId, a.bId) === key) return
         setUnread((u) => ({ ...u, [key]: (u[key] ?? 0) + 1 }))
-        notify(m.other.displayName, msg.data.body, `/`)
+        const current = matchesRef.current.find(
+          (mm) => keyOf(mm.match.aId, mm.match.bId) === key,
+        )
+        notify(current?.other.displayName ?? 'Someone', msg.data.body)
       })
       roomsRef.current.set(key, room)
     }
@@ -117,7 +120,7 @@ export function useRealtime(
     }
   }, [])
 
-  function clearUnread(aId: string, bId: string) {
+  const clearUnread = useCallback((aId: string, bId: string) => {
     const key = keyOf(aId, bId)
     setUnread((u) => {
       if (!u[key]) return u
@@ -125,7 +128,7 @@ export function useRealtime(
       delete next[key]
       return next
     })
-  }
+  }, [])
 
   return { unread, clearUnread }
 }
@@ -134,17 +137,13 @@ export function keyOf(aId: string, bId: string): string {
   return `${aId}:${bId}`
 }
 
-function notify(title: string, body: string, url: string) {
+function notify(title: string, body: string) {
   if (typeof Notification === 'undefined') return
   if (Notification.permission !== 'granted') return
   if (typeof document !== 'undefined' && !document.hidden) return
   try {
     const n = new Notification(title, { body, tag: title })
-    n.onclick = () => {
-      window.focus()
-      if (url && url !== '/') window.location.href = url
-      n.close()
-    }
+    n.onclick = () => { window.focus(); n.close() }
   } catch { /* some browsers throw if constructor used in non-secure context */ }
 }
 

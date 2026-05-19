@@ -59,13 +59,14 @@ export default function Chat({ me, aId, bId, otherName, onNavigate }: Props) {
     if (!body || sending) return
     setSending(true)
     setError(null)
+    setText('')
     try {
       const msg = await sendMessage(aId, bId, me.userId, body)
       setMessages((prev) => [...prev, msg])
-      setText('')
       roomRef.current?.send(msg)
     } catch (e) {
       setError((e as Error).message)
+      setText((current) => current || body)
     } finally {
       setSending(false)
     }
