@@ -92,8 +92,12 @@ function Ready({
     if (view.name === 'matches' || view.name === 'discover') refreshMatches()
   }, [view, refreshMatches])
 
+  const [incomingMatch, setIncomingMatch] = useState<Profile | null>(null)
   const activeChat = view.name === 'chat' ? { aId: view.aId, bId: view.bId } : null
-  const { unread, clearUnread } = useRealtime(matches, activeChat)
+  const { unread, clearUnread } = useRealtime(matches, activeChat, me.userId, (other) => {
+    refreshMatches()
+    setIncomingMatch(other)
+  })
 
   useEffect(() => {
     if (view.name === 'chat') clearUnread(view.aId, view.bId)
@@ -118,6 +122,49 @@ function Ready({
         )}
       </main>
       <BottomNav active={view.name} unread={totalUnread} onChange={(n) => setView({ name: n } as View)} />
+      {incomingMatch && (
+        <IncomingMatchOverlay
+          me={me}
+          other={incomingMatch}
+          onOpenChat={() => {
+            const [aId, bId] = me.userId < incomingMatch.userId
+              ? [me.userId, incomingMatch.userId]
+              : [incomingMatch.userId, me.userId]
+            setIncomingMatch(null)
+            setView({ name: 'chat', aId, bId, otherName: incomingMatch.displayName })
+          }}
+          onClose={() => setIncomingMatch(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+function IncomingMatchOverlay({
+  me, other, onOpenChat, onClose,
+}: {
+  me: Profile; other: Profile
+  onOpenChat: () => void; onClose: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-50 bg-[var(--accent)]/95 text-white flex flex-col items-center justify-center px-6 text-center">
+      <h2 className="display-font text-5xl mb-2">It&rsquo;s a match!</h2>
+      <p className="mb-10 opacity-90">You and {other.displayName} liked each other.</p>
+      <div className="flex gap-6 mb-12">
+        <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-white bg-white/20">
+          {me.photos[0] && <img src={me.photos[0]} alt="" className="w-full h-full object-cover" />}
+        </div>
+        <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-white bg-white/20">
+          {other.photos[0] && <img src={other.photos[0]} alt="" className="w-full h-full object-cover" />}
+        </div>
+      </div>
+      <button
+        onClick={onOpenChat}
+        className="rounded-full bg-white text-[var(--accent)] font-semibold px-8 py-3 mb-3"
+      >
+        Say hi
+      </button>
+      <button onClick={onClose} className="text-white/80 underline text-sm">Keep swiping</button>
     </div>
   )
 }

@@ -4,6 +4,7 @@ import { loadCandidates, recordSwipe, countAdmirers } from '../lib/db'
 import { ageFromDob } from '../lib/photos'
 import { formatDistance } from '../lib/geo'
 import { loadPrefs } from '../lib/prefs'
+import { broadcastMatch } from '../lib/realtime'
 
 interface Props {
   me: Profile
@@ -49,6 +50,12 @@ export default function Discover({ me, onMatched, onNavigate }: Props) {
       if (match) {
         setMatched(target)
         onMatched()
+        broadcastMatch(target.userId, {
+          kind: 'match',
+          aId: match.aId,
+          bId: match.bId,
+          otherId: me.userId,
+        })
       }
     } catch (e) {
       setError((e as Error).message)
