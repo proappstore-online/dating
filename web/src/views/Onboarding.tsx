@@ -5,13 +5,14 @@ import { uploadProfilePhoto, ageFromDob } from '../lib/photos'
 
 interface Props {
   userId: string
+  /** Platform-level date of birth — set by AgeGate before this view ever renders. */
+  dob: string
   initial: Profile | null
   onDone: () => void
 }
 
-export default function Onboarding({ userId, initial, onDone }: Props) {
+export default function Onboarding({ userId, dob, initial, onDone }: Props) {
   const [displayName, setDisplayName] = useState(initial?.displayName ?? '')
-  const [dob, setDob] = useState(initial?.dob ?? '')
   const [bio, setBio] = useState(initial?.bio ?? '')
   const [gender, setGender] = useState<Gender>(initial?.gender ?? 'woman')
   const [lookingFor, setLookingFor] = useState<LookingFor>(initial?.lookingFor ?? 'everyone')
@@ -36,7 +37,7 @@ export default function Onboarding({ userId, initial, onDone }: Props) {
   const age = ageFromDob(dob)
   const canSave =
     displayName.trim().length >= 2 &&
-    age != null && age >= 18 && age <= 120 &&
+    age != null && age >= 18 &&
     photos.length >= 1
 
   async function handleFiles(files: FileList | null) {
@@ -137,18 +138,11 @@ export default function Onboarding({ userId, initial, onDone }: Props) {
         />
       </Section>
 
-      <Section label="Date of birth">
-        <input
-          type="date"
-          value={dob}
-          onChange={(e) => setDob(e.target.value)}
-          className="w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-base"
-        />
-        {age != null && (
-          <p className="text-xs text-[var(--muted)] mt-1">
-            Shown as age {age}{age < 18 ? ' — must be 18+' : ''}.
-          </p>
-        )}
+      <Section label="Age">
+        <div className="rounded-xl bg-[var(--accent-soft)] px-4 py-3 text-sm flex items-center justify-between">
+          <span>{age != null ? `${age} years old` : 'Unknown'}</span>
+          <span className="text-xs text-[var(--muted)]">from platform &mdash; can&rsquo;t change</span>
+        </div>
       </Section>
 
       <Section label="About you">

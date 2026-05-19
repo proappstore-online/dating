@@ -39,6 +39,7 @@ export default function ProfileTab({ me, onUpdated, onNavigate }: Props) {
     return (
       <Onboarding
         userId={me.userId}
+        dob={me.dob}
         initial={me}
         onDone={() => {
           setEditing(false)

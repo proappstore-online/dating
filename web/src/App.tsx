@@ -5,7 +5,9 @@ import { app } from './lib/app'
 import { getMyProfile, loadMatches, type MatchWithProfile } from './lib/db'
 import { useRealtime } from './lib/realtime'
 import SignIn from './views/SignIn'
+import AgeGate from './views/AgeGate'
 import Onboarding from './views/Onboarding'
+import { ageFromDob } from './lib/photos'
 import Discover from './views/Discover'
 import Admirers from './views/Admirers'
 import Matches from './views/Matches'
@@ -15,7 +17,9 @@ import ProfileTab from './views/ProfileTab'
 type Stage =
   | { name: 'booting' }
   | { name: 'signin' }
-  | { name: 'onboarding'; user: User; initial: Profile | null }
+  | { name: 'age-gate'; user: User }
+  | { name: 'too-young'; age: number }
+  | { name: 'onboarding'; user: User; dob: string; initial: Profile | null }
   | { name: 'ready'; user: User; me: Profile }
 
 export default function App() {
@@ -33,17 +37,26 @@ export default function App() {
           setView({ name: 'discover' })
           return
         }
+        if (!user.dateOfBirth) {
+          setStage({ name: 'age-gate', user })
+          return
+        }
+        const age = ageFromDob(user.dateOfBirth)
+        if (age == null || age < 18) {
+          setStage({ name: 'too-young', age: age ?? 0 })
+          return
+        }
         try {
           const profile = await getMyProfile(user.id)
           if (cancelled) return
           if (!profile) {
-            setStage({ name: 'onboarding', user, initial: null })
+            setStage({ name: 'onboarding', user, dob: user.dateOfBirth, initial: null })
           } else {
             setStage({ name: 'ready', user, me: profile })
             setView({ name: 'discover' })
           }
         } catch {
-          if (!cancelled) setStage({ name: 'onboarding', user, initial: null })
+          if (!cancelled) setStage({ name: 'onboarding', user, dob: user.dateOfBirth, initial: null })
         }
       })
       return () => off()
@@ -57,10 +70,44 @@ export default function App() {
   if (stage.name === 'signin') {
     return <SignIn />
   }
+  if (stage.name === 'age-gate') {
+    return (
+      <AgeGate
+        onSet={() => {
+          const user = app.auth.user
+          if (!user || !user.dateOfBirth) return
+          const age = ageFromDob(user.dateOfBirth)
+          if (age == null || age < 18) {
+            setStage({ name: 'too-young', age: age ?? 0 })
+          } else {
+            setStage({ name: 'onboarding', user, dob: user.dateOfBirth, initial: null })
+          }
+        }}
+      />
+    )
+  }
+  if (stage.name === 'too-young') {
+    return (
+      <div className="min-h-dvh flex flex-col items-center justify-center px-6 text-center">
+        <div className="text-5xl mb-4">&#9203;</div>
+        <h1 className="display-font text-3xl mb-2">Come back later.</h1>
+        <p className="text-[var(--muted)] max-w-xs mb-6">
+          Dating is 18+. You can keep using other ProAppStore apps in the meantime.
+        </p>
+        <button
+          onClick={() => app.auth.signOut()}
+          className="rounded-full border border-[var(--line)] px-6 py-2.5"
+        >
+          Sign out
+        </button>
+      </div>
+    )
+  }
   if (stage.name === 'onboarding') {
     return (
       <Onboarding
         userId={stage.user.id}
+        dob={stage.dob}
         initial={stage.initial}
         onDone={async () => {
           const me = await getMyProfile(stage.user.id)
