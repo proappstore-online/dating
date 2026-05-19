@@ -317,6 +317,43 @@ export async function sendMessage(
   return msg
 }
 
+/**
+ * Count incoming right-swipes I haven't reciprocated yet (and that aren't from
+ * users I've blocked or who have blocked me). Each one is a guaranteed match
+ * waiting on my swipe.
+ */
+export async function countAdmirers(userId: string): Promise<number> {
+  await ensureMigrated()
+  const { rows } = await app.db.query<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM swipes s
+     WHERE s.target_id = ? AND s.direction = 'right'
+       AND NOT EXISTS (SELECT 1 FROM swipes me WHERE me.swiper_id = ? AND me.target_id = s.swiper_id)
+       AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = ? AND b.blocked_id = s.swiper_id) OR (b.blocker_id = s.swiper_id AND b.blocked_id = ?))`,
+    [userId, userId, userId, userId],
+  )
+  return rows[0]?.n ?? 0
+}
+
+/**
+ * Profiles that have right-swiped me, ordered most recent first. Used to
+ * populate the "X likes you" preview list — these are guaranteed matches the
+ * moment the user swipes right.
+ */
+export async function loadAdmirers(userId: string, limit = 50): Promise<Profile[]> {
+  await ensureMigrated()
+  const { rows } = await app.db.query<ProfileRow>(
+    `SELECT p.* FROM swipes s
+       JOIN profiles p ON p.user_id = s.swiper_id
+     WHERE s.target_id = ? AND s.direction = 'right'
+       AND NOT EXISTS (SELECT 1 FROM swipes me WHERE me.swiper_id = ? AND me.target_id = s.swiper_id)
+       AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = ? AND b.blocked_id = s.swiper_id) OR (b.blocker_id = s.swiper_id AND b.blocked_id = ?))
+     ORDER BY s.created_at DESC
+     LIMIT ?`,
+    [userId, userId, userId, userId, limit],
+  )
+  return rows.map(rowToProfile)
+}
+
 export async function unmatch(aId: string, bId: string): Promise<void> {
   await ensureMigrated()
   await app.db.batch([

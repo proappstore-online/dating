@@ -4,7 +4,11 @@ import { app } from '../lib/app'
 import { ageFromDob } from '../lib/photos'
 import { loadPrefs, savePrefs, type Preferences, DEFAULT_PREFS } from '../lib/prefs'
 import { getNotificationPermission, requestNotificationPermission } from '../lib/realtime'
+import { seedDemoProfiles } from '../lib/seed'
 import Onboarding from './Onboarding'
+
+const SEED_ENABLED = typeof window !== 'undefined' &&
+  new URLSearchParams(window.location.search).has('seed')
 
 interface Props {
   me: Profile
@@ -17,6 +21,7 @@ export default function ProfileTab({ me, onUpdated, onNavigate }: Props) {
   const [prefs, setPrefs] = useState<Preferences>(DEFAULT_PREFS)
   const [prefsLoaded, setPrefsLoaded] = useState(false)
   const [notifPerm, setNotifPerm] = useState<NotificationPermission | 'unsupported'>(getNotificationPermission())
+  const [seedStatus, setSeedStatus] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -137,6 +142,28 @@ export default function ProfileTab({ me, onUpdated, onNavigate }: Props) {
       >
         Sign out
       </button>
+
+      {SEED_ENABLED && (
+        <div className="mt-8 p-4 rounded-2xl bg-[var(--accent-soft)] border border-dashed border-[var(--accent)]">
+          <p className="text-xs font-semibold text-[var(--accent)] uppercase tracking-wider mb-1">Dev tools</p>
+          <p className="text-sm text-[var(--ink)] mb-3">Insert 12 demo profiles around your location so you can swipe.</p>
+          <button
+            onClick={async () => {
+              setSeedStatus('Inserting…')
+              try {
+                const n = await seedDemoProfiles(me.lat, me.lng)
+                setSeedStatus(`Inserted ${n} demo profiles. Head to Discover.`)
+              } catch (e) {
+                setSeedStatus('Failed: ' + (e as Error).message)
+              }
+            }}
+            className="rounded-full bg-[var(--accent)] text-white font-semibold px-4 py-2 text-sm"
+          >
+            Seed demo profiles
+          </button>
+          {seedStatus && <p className="text-xs mt-2 text-[var(--ink)]">{seedStatus}</p>}
+        </div>
+      )}
     </div>
   )
 }

@@ -7,6 +7,7 @@ import { useRealtime } from './lib/realtime'
 import SignIn from './views/SignIn'
 import Onboarding from './views/Onboarding'
 import Discover from './views/Discover'
+import Admirers from './views/Admirers'
 import Matches from './views/Matches'
 import Chat from './views/Chat'
 import ProfileTab from './views/ProfileTab'
@@ -107,7 +108,8 @@ function Ready({
   return (
     <div className="flex flex-col h-dvh">
       <main className="flex-1 overflow-y-auto">
-        {view.name === 'discover' && <Discover me={me} onMatched={refreshMatches} />}
+        {view.name === 'discover' && <Discover me={me} onMatched={refreshMatches} onNavigate={setView} />}
+        {view.name === 'admirers' && <Admirers me={me} onNavigate={setView} />}
         {view.name === 'matches' && (
           <Matches me={me} matches={matches} unread={unread} onNavigate={setView} />
         )}

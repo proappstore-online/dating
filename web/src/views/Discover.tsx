@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
-import type { Candidate, Profile, SwipeDirection } from '../types'
-import { loadCandidates, recordSwipe } from '../lib/db'
+import type { Candidate, Profile, SwipeDirection, View } from '../types'
+import { loadCandidates, recordSwipe, countAdmirers } from '../lib/db'
 import { ageFromDob } from '../lib/photos'
 import { formatDistance } from '../lib/geo'
 import { loadPrefs } from '../lib/prefs'
@@ -8,24 +8,31 @@ import { loadPrefs } from '../lib/prefs'
 interface Props {
   me: Profile
   onMatched: () => void
+  onNavigate: (v: View) => void
 }
 
 const THRESHOLD = 120
 const FLY_OUT = 700
 
-export default function Discover({ me, onMatched }: Props) {
+export default function Discover({ me, onMatched, onNavigate }: Props) {
   const [stack, setStack] = useState<Candidate[]>([])
   const [loading, setLoading] = useState(true)
   const [matched, setMatched] = useState<Candidate | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [admirerCount, setAdmirerCount] = useState(0)
 
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       try {
         const prefs = await loadPrefs()
-        const candidates = await loadCandidates(me, prefs)
-        if (!cancelled) setStack(candidates.reverse())
+        const [candidates, admirers] = await Promise.all([
+          loadCandidates(me, prefs),
+          countAdmirers(me.userId),
+        ])
+        if (cancelled) return
+        setStack(candidates.reverse())
+        setAdmirerCount(admirers)
       } catch (e) {
         if (!cancelled) setError((e as Error).message)
       } finally {
@@ -69,6 +76,18 @@ export default function Discover({ me, onMatched }: Props) {
 
   return (
     <div className="relative h-full w-full flex flex-col">
+      {admirerCount > 0 && (
+        <button
+          onClick={() => onNavigate({ name: 'admirers' })}
+          className="mx-4 mt-3 rounded-2xl bg-[var(--accent)] text-white px-4 py-3 flex items-center gap-3 active:opacity-90 transition"
+        >
+          <span className="text-2xl">&#10084;</span>
+          <span className="font-semibold text-left flex-1">
+            {admirerCount} {admirerCount === 1 ? 'person likes' : 'people like'} you
+          </span>
+          <span className="text-xl opacity-80">&rsaquo;</span>
+        </button>
+      )}
       <div className="relative flex-1 flex items-center justify-center px-4 pb-4">
         {next && <Card key={next.userId} profile={next} isTop={false} onDecide={() => {}} />}
         {top && <Card key={top.userId} profile={top} isTop={true} onDecide={(d) => handleSwipe(top, d)} />}

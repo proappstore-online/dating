@@ -46,6 +46,7 @@ export type View =
   | { name: 'signin' }
   | { name: 'onboarding' }
   | { name: 'discover' }
+  | { name: 'admirers' }
   | { name: 'matches' }
   | { name: 'chat'; aId: string; bId: string; otherName: string }
   | { name: 'profile' }
