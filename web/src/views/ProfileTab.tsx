@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Profile, View } from '../types'
 import { app } from '../lib/app'
 import { ageFromDob } from '../lib/photos'
+import { loadPrefs, savePrefs, type Preferences, DEFAULT_PREFS } from '../lib/prefs'
+import { getNotificationPermission, requestNotificationPermission } from '../lib/realtime'
 import Onboarding from './Onboarding'
 
 interface Props {
@@ -12,6 +14,21 @@ interface Props {
 
 export default function ProfileTab({ me, onUpdated, onNavigate }: Props) {
   const [editing, setEditing] = useState(false)
+  const [prefs, setPrefs] = useState<Preferences>(DEFAULT_PREFS)
+  const [prefsLoaded, setPrefsLoaded] = useState(false)
+  const [notifPerm, setNotifPerm] = useState<NotificationPermission | 'unsupported'>(getNotificationPermission())
+
+  useEffect(() => {
+    let cancelled = false
+    loadPrefs().then((p) => { if (!cancelled) { setPrefs(p); setPrefsLoaded(true) } })
+    return () => { cancelled = true }
+  }, [])
+
+  async function patchPrefs(patch: Partial<Preferences>) {
+    const next = { ...prefs, ...patch }
+    setPrefs(next)
+    try { await savePrefs(next) } catch { /* swallow; will re-sync on next load */ }
+  }
 
   if (editing) {
     return (
@@ -48,6 +65,66 @@ export default function ProfileTab({ me, onUpdated, onNavigate }: Props) {
       <Row label="Looking for" value={lookingForLabel(me.lookingFor)} />
       <Row label="Photos" value={`${me.photos.length} uploaded`} />
 
+      <h3 className="display-font text-xl mt-8 mb-2">Notifications</h3>
+      <div className="rounded-2xl border border-[var(--line)] p-4 bg-white flex items-center justify-between gap-3">
+        <div className="text-sm">
+          {notifPerm === 'granted' && 'On — you&rsquo;ll hear about new messages.'}
+          {notifPerm === 'denied' && (
+            <span className="text-[var(--muted)]">Blocked in browser settings.</span>
+          )}
+          {notifPerm === 'default' && 'Get pinged when someone messages you.'}
+          {notifPerm === 'unsupported' && (
+            <span className="text-[var(--muted)]">Not supported in this browser.</span>
+          )}
+        </div>
+        {notifPerm === 'default' && (
+          <button
+            onClick={async () => setNotifPerm(await requestNotificationPermission())}
+            className="rounded-full bg-[var(--ink)] text-[var(--paper)] font-semibold px-4 py-2 text-sm flex-shrink-0"
+          >
+            Enable
+          </button>
+        )}
+        {notifPerm === 'granted' && (
+          <span className="text-[var(--success)] font-semibold text-sm flex-shrink-0">On</span>
+        )}
+      </div>
+
+      <h3 className="display-font text-xl mt-8 mb-2">Discovery</h3>
+      <div className="rounded-2xl border border-[var(--line)] p-4 bg-white">
+        <Slider
+          label="Maximum distance"
+          value={prefs.maxDistanceKm}
+          min={5}
+          max={500}
+          step={5}
+          format={(v) => `${v} km`}
+          onChange={(v) => patchPrefs({ maxDistanceKm: v })}
+          disabled={!prefsLoaded}
+        />
+        <div className="h-px bg-[var(--line)] my-4" />
+        <Slider
+          label="Minimum age"
+          value={prefs.minAge}
+          min={18}
+          max={Math.max(18, prefs.maxAge - 1)}
+          step={1}
+          format={(v) => String(v)}
+          onChange={(v) => patchPrefs({ minAge: v })}
+          disabled={!prefsLoaded}
+        />
+        <Slider
+          label="Maximum age"
+          value={prefs.maxAge}
+          min={Math.min(80, prefs.minAge + 1)}
+          max={80}
+          step={1}
+          format={(v) => String(v)}
+          onChange={(v) => patchPrefs({ maxAge: v })}
+          disabled={!prefsLoaded}
+        />
+      </div>
+
       <button
         onClick={() => setEditing(true)}
         className="w-full rounded-full bg-[var(--ink)] text-[var(--paper)] font-semibold py-3.5 mt-6"
@@ -61,6 +138,38 @@ export default function ProfileTab({ me, onUpdated, onNavigate }: Props) {
         Sign out
       </button>
     </div>
+  )
+}
+
+function Slider({
+  label, value, min, max, step, format, onChange, disabled,
+}: {
+  label: string
+  value: number
+  min: number
+  max: number
+  step: number
+  format: (v: number) => string
+  onChange: (v: number) => void
+  disabled?: boolean
+}) {
+  return (
+    <label className="block">
+      <div className="flex justify-between text-sm mb-1">
+        <span className="text-[var(--muted)]">{label}</span>
+        <span className="font-semibold">{format(value)}</span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full accent-[var(--accent)]"
+      />
+    </label>
   )
 }
 

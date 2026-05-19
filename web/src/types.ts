@@ -38,6 +38,10 @@ export interface Message {
   createdAt: number
 }
 
+export interface Candidate extends Profile {
+  distanceKm: number | null
+}
+
 export type View =
   | { name: 'signin' }
   | { name: 'onboarding' }

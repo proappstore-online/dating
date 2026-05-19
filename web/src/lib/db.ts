@@ -1,5 +1,8 @@
 import { app } from './app'
-import type { Profile, Gender, LookingFor, Match, Message, SwipeDirection } from '../types'
+import type { Candidate, Profile, Gender, LookingFor, Match, Message, SwipeDirection } from '../types'
+import { kmBetween } from './geo'
+import { ageFromDob } from './photos'
+import type { Preferences } from './prefs'
 
 const MIGRATIONS = [
   {
@@ -46,6 +49,28 @@ const MIGRATIONS = [
         created_at INTEGER NOT NULL
       );
       CREATE INDEX IF NOT EXISTS idx_messages_match ON messages(match_a, match_b, created_at);
+    `,
+  },
+  {
+    name: '0002_safety',
+    sql: `
+      CREATE TABLE IF NOT EXISTS blocks (
+        blocker_id TEXT NOT NULL,
+        blocked_id TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        PRIMARY KEY (blocker_id, blocked_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_blocks_blocked ON blocks(blocked_id);
+
+      CREATE TABLE IF NOT EXISTS reports (
+        id          TEXT PRIMARY KEY,
+        reporter_id TEXT NOT NULL,
+        reported_id TEXT NOT NULL,
+        reason      TEXT NOT NULL,
+        note        TEXT NOT NULL DEFAULT '',
+        created_at  INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_reports_reported ON reports(reported_id, created_at DESC);
     `,
   },
 ]
@@ -111,25 +136,54 @@ export async function saveProfile(p: Profile): Promise<void> {
 }
 
 /**
- * Candidates I haven't swiped on yet, filtered by mutual orientation compatibility.
- * Returns at most `limit` rows ordered by most recently updated.
+ * Candidates I haven't swiped on yet, filtered by orientation, age, and max-distance.
+ * Pulls a wide pool, then computes haversine distance + age in JS so we can rank
+ * by distance and drop anyone outside the preferred radius/age band. D1 has no
+ * trig functions, so the work has to happen client-side.
  */
-export async function loadCandidates(me: Profile, limit = 25): Promise<Profile[]> {
+export async function loadCandidates(
+  me: Profile,
+  prefs: Preferences,
+  limit = 25,
+): Promise<Candidate[]> {
   await ensureMigrated()
   const wants = wantsGenderSql(me.lookingFor)
   const wantsMe = `(p.looking_for = 'everyone' OR p.looking_for = ?)`
   const myGenderTarget = me.gender === 'woman' ? 'women' : me.gender === 'man' ? 'men' : 'everyone'
+  const pool = Math.max(limit * 4, 100)
   const { rows } = await app.db.query<ProfileRow>(
     `SELECT p.* FROM profiles p
      WHERE p.user_id != ?
        AND ${wants}
        AND ${wantsMe}
        AND NOT EXISTS (SELECT 1 FROM swipes s WHERE s.swiper_id = ? AND s.target_id = p.user_id)
+       AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = ? AND b.blocked_id = p.user_id) OR (b.blocker_id = p.user_id AND b.blocked_id = ?))
      ORDER BY p.updated_at DESC
      LIMIT ?`,
-    [me.userId, myGenderTarget, me.userId, limit],
+    [me.userId, myGenderTarget, me.userId, me.userId, me.userId, pool],
   )
-  return rows.map(rowToProfile)
+
+  const out: Candidate[] = []
+  for (const r of rows) {
+    const p = rowToProfile(r)
+    const age = ageFromDob(p.dob)
+    if (age == null || age < prefs.minAge || age > prefs.maxAge) continue
+    let distanceKm: number | null = null
+    if (me.lat != null && me.lng != null && p.lat != null && p.lng != null) {
+      distanceKm = kmBetween(me.lat, me.lng, p.lat, p.lng)
+      if (distanceKm > prefs.maxDistanceKm) continue
+    }
+    out.push({ ...p, distanceKm })
+  }
+
+  out.sort((a, b) => {
+    if (a.distanceKm == null && b.distanceKm == null) return b.updatedAt - a.updatedAt
+    if (a.distanceKm == null) return 1
+    if (b.distanceKm == null) return -1
+    return a.distanceKm - b.distanceKm
+  })
+
+  return out.slice(0, limit)
 }
 
 function wantsGenderSql(lookingFor: LookingFor): string {
@@ -261,4 +315,61 @@ export async function sendMessage(
     [msg.id, msg.matchA, msg.matchB, msg.senderId, msg.body, msg.createdAt],
   )
   return msg
+}
+
+export async function unmatch(aId: string, bId: string): Promise<void> {
+  await ensureMigrated()
+  await app.db.batch([
+    { sql: `DELETE FROM messages WHERE match_a = ? AND match_b = ?`, params: [aId, bId] },
+    { sql: `DELETE FROM matches WHERE a_id = ? AND b_id = ?`, params: [aId, bId] },
+  ])
+}
+
+/**
+ * Block another user. Removes any existing match + messages, records a swipe-left
+ * to keep them out of discovery, and inserts a blocks row so the block is symmetric:
+ * the candidate query excludes pairs where either side has blocked the other.
+ */
+export async function blockUser(blockerId: string, blockedId: string): Promise<void> {
+  await ensureMigrated()
+  const [aId, bId] = orderedPair(blockerId, blockedId)
+  const now = Date.now()
+  await app.db.batch([
+    { sql: `INSERT OR IGNORE INTO blocks (blocker_id, blocked_id, created_at) VALUES (?, ?, ?)`, params: [blockerId, blockedId, now] },
+    { sql: `INSERT OR REPLACE INTO swipes (swiper_id, target_id, direction, created_at) VALUES (?, ?, 'left', ?)`, params: [blockerId, blockedId, now] },
+    { sql: `DELETE FROM messages WHERE match_a = ? AND match_b = ?`, params: [aId, bId] },
+    { sql: `DELETE FROM matches WHERE a_id = ? AND b_id = ?`, params: [aId, bId] },
+  ])
+}
+
+export async function unblock(blockerId: string, blockedId: string): Promise<void> {
+  await ensureMigrated()
+  await app.db.execute(
+    `DELETE FROM blocks WHERE blocker_id = ? AND blocked_id = ?`,
+    [blockerId, blockedId],
+  )
+}
+
+export async function isBlocked(aId: string, bId: string): Promise<boolean> {
+  await ensureMigrated()
+  const { rows } = await app.db.query<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM blocks WHERE (blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?)`,
+    [aId, bId, bId, aId],
+  )
+  return (rows[0]?.n ?? 0) > 0
+}
+
+export type ReportReason = 'inappropriate' | 'spam' | 'underage' | 'harassment' | 'fake' | 'other'
+
+export async function reportUser(
+  reporterId: string,
+  reportedId: string,
+  reason: ReportReason,
+  note: string,
+): Promise<void> {
+  await ensureMigrated()
+  await app.db.execute(
+    `INSERT INTO reports (id, reporter_id, reported_id, reason, note, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
+    [crypto.randomUUID(), reporterId, reportedId, reason, note, Date.now()],
+  )
 }

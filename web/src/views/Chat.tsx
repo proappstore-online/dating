@@ -3,6 +3,7 @@ import type { Message, Profile, View } from '../types'
 import { loadMessages, sendMessage } from '../lib/db'
 import { app } from '../lib/app'
 import type { Room, RoomMessage } from '@proappstore/sdk'
+import SafetyMenu from './SafetyMenu'
 
 interface Props {
   me: Profile
@@ -17,6 +18,7 @@ export default function Chat({ me, aId, bId, otherName, onNavigate }: Props) {
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -80,6 +82,13 @@ export default function Chat({ me, aId, bId, otherName, onNavigate }: Props) {
           &larr;
         </button>
         <h1 className="font-semibold flex-1 truncate">{otherName}</h1>
+        <button
+          onClick={() => setMenuOpen(true)}
+          className="text-2xl text-[var(--muted)] active:opacity-50 px-2"
+          aria-label="More options"
+        >
+          &#8942;
+        </button>
       </header>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
@@ -128,6 +137,18 @@ export default function Chat({ me, aId, bId, otherName, onNavigate }: Props) {
           Send
         </button>
       </form>
+
+      {menuOpen && (
+        <SafetyMenu
+          meId={me.userId}
+          otherId={me.userId === aId ? bId : aId}
+          aId={aId}
+          bId={bId}
+          otherName={otherName}
+          onClose={() => setMenuOpen(false)}
+          onDone={() => { setMenuOpen(false); onNavigate({ name: 'matches' }) }}
+        />
+      )}
     </div>
   )
 }

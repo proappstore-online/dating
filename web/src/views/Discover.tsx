@@ -1,27 +1,31 @@
 import { useState, useEffect, useRef } from 'react'
-import type { Profile, SwipeDirection } from '../types'
+import type { Candidate, Profile, SwipeDirection } from '../types'
 import { loadCandidates, recordSwipe } from '../lib/db'
 import { ageFromDob } from '../lib/photos'
+import { formatDistance } from '../lib/geo'
+import { loadPrefs } from '../lib/prefs'
 
 interface Props {
   me: Profile
+  onMatched: () => void
 }
 
 const THRESHOLD = 120
 const FLY_OUT = 700
 
-export default function Discover({ me }: Props) {
-  const [stack, setStack] = useState<Profile[]>([])
+export default function Discover({ me, onMatched }: Props) {
+  const [stack, setStack] = useState<Candidate[]>([])
   const [loading, setLoading] = useState(true)
-  const [matched, setMatched] = useState<Profile | null>(null)
+  const [matched, setMatched] = useState<Candidate | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       try {
-        const candidates = await loadCandidates(me)
-        if (!cancelled) setStack(candidates)
+        const prefs = await loadPrefs()
+        const candidates = await loadCandidates(me, prefs)
+        if (!cancelled) setStack(candidates.reverse())
       } catch (e) {
         if (!cancelled) setError((e as Error).message)
       } finally {
@@ -31,11 +35,14 @@ export default function Discover({ me }: Props) {
     return () => { cancelled = true }
   }, [me])
 
-  async function handleSwipe(target: Profile, direction: SwipeDirection) {
+  async function handleSwipe(target: Candidate, direction: SwipeDirection) {
     setStack((s) => s.filter((p) => p.userId !== target.userId))
     try {
       const match = await recordSwipe(me.userId, target.userId, direction)
-      if (match) setMatched(target)
+      if (match) {
+        setMatched(target)
+        onMatched()
+      }
     } catch (e) {
       setError((e as Error).message)
     }
@@ -80,7 +87,7 @@ function Card({
   isTop,
   onDecide,
 }: {
-  profile: Profile
+  profile: Candidate
   isTop: boolean
   onDecide: (direction: SwipeDirection) => void
 }) {
@@ -174,7 +181,10 @@ function Card({
           <h2 className="text-2xl font-bold display-font">{profile.displayName}</h2>
           {age != null && <span className="text-2xl font-light opacity-90">{age}</span>}
         </div>
-        {profile.bio && <p className="text-sm mt-1 opacity-90 line-clamp-3">{profile.bio}</p>}
+        {profile.distanceKm != null && (
+          <p className="text-xs opacity-80 mt-0.5">{formatDistance(profile.distanceKm)}</p>
+        )}
+        {profile.bio && <p className="text-sm mt-1.5 opacity-90 line-clamp-3">{profile.bio}</p>}
       </div>
 
       {isTop && (
@@ -225,7 +235,7 @@ function CenteredMessage({ children }: { children: React.ReactNode }) {
   )
 }
 
-function MatchOverlay({ me, other, onClose }: { me: Profile; other: Profile; onClose: () => void }) {
+function MatchOverlay({ me, other, onClose }: { me: Profile; other: Candidate; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 bg-[var(--accent)]/95 text-white flex flex-col items-center justify-center px-6 text-center">
       <h2 className="display-font text-5xl mb-2">It&rsquo;s a match!</h2>
