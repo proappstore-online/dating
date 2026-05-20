@@ -49,8 +49,11 @@ export default function AgeGate({ onSet }: Props) {
         className="w-full max-w-xs rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-base text-center"
       />
       {age != null && (
-        <p className={`text-xs mt-2 ${age < 18 ? 'text-[var(--error)]' : 'text-[var(--muted)]'}`}>
-          {age < 18 ? `${age} — dating is 18+. Sorry.` : `You’ll be shown as age ${age}.`}
+        <p className={`text-xs mt-2 ${age >= 18 && age <= 120 ? 'text-[var(--muted)]' : 'text-[var(--error)]'}`}>
+          {age < 0 ? "That's in the future." :
+            age < 18 ? `${age} — dating is 18+. Sorry.` :
+            age > 120 ? "That doesn't look right." :
+            `You'll be shown as age ${age}.`}
         </p>
       )}
       {error && <p className="text-[var(--error)] text-sm mt-3">{error}</p>}

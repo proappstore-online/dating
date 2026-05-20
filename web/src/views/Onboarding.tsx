@@ -25,13 +25,16 @@ export default function Onboarding({ userId, dob, initial, onDone }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    if (lat == null && navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => { setLat(pos.coords.latitude); setLng(pos.coords.longitude) },
-        () => {},
-        { timeout: 5000 },
-      )
-    }
+    if (lat != null || !navigator.geolocation) return
+    // No timeout — the browser permission prompt can sit for minutes
+    // and a 5s abort would silently kill the request as soon as the
+    // user blinked, leaving the profile without coordinates. Long-cache
+    // is fine (5 minutes) since profile fixed to home base is typical.
+    navigator.geolocation.getCurrentPosition(
+      (pos) => { setLat(pos.coords.latitude); setLng(pos.coords.longitude) },
+      () => { /* swallow: user can save without coords and edit later */ },
+      { maximumAge: 5 * 60 * 1000 },
+    )
   }, [lat])
 
   const age = ageFromDob(dob)
@@ -39,6 +42,10 @@ export default function Onboarding({ userId, dob, initial, onDone }: Props) {
     displayName.trim().length >= 2 &&
     age != null && age >= 18 &&
     photos.length >= 1
+
+  const missing: string[] = []
+  if (displayName.trim().length < 2) missing.push('display name (2+ chars)')
+  if (photos.length < 1) missing.push('at least one photo')
 
   async function handleFiles(files: FileList | null) {
     if (!files) return
@@ -60,6 +67,16 @@ export default function Onboarding({ userId, dob, initial, onDone }: Props) {
 
   function removePhoto(url: string) {
     setPhotos((p) => p.filter((u) => u !== url))
+  }
+
+  function movePhoto(idx: number, dir: -1 | 1) {
+    setPhotos((p) => {
+      const j = idx + dir
+      if (j < 0 || j >= p.length) return p
+      const next = [...p]
+      ;[next[idx], next[j]] = [next[j]!, next[idx]!]
+      return next
+    })
   }
 
   async function handleSave() {
@@ -95,9 +112,32 @@ export default function Onboarding({ userId, dob, initial, onDone }: Props) {
 
       <Section label="Photos">
         <div className="grid grid-cols-3 gap-2">
-          {photos.map((url) => (
-            <div key={url} className="relative aspect-square rounded-xl overflow-hidden bg-[var(--accent-soft)]">
+          {photos.map((url, idx) => (
+            <div key={url} className="relative aspect-square rounded-xl overflow-hidden bg-[var(--accent-soft)] group">
               <img src={url} alt="" className="w-full h-full object-cover" />
+              {idx === 0 && (
+                <span className="absolute bottom-1 left-1 bg-[var(--accent)] text-white text-[10px] font-bold uppercase tracking-wide rounded px-1.5 py-0.5">
+                  Primary
+                </span>
+              )}
+              <div className="absolute top-1 left-1 flex gap-1">
+                <button
+                  onClick={() => movePhoto(idx, -1)}
+                  disabled={idx === 0}
+                  className="w-6 h-6 rounded-full bg-black/60 text-white text-xs leading-none flex items-center justify-center disabled:opacity-30"
+                  aria-label="Move left"
+                >
+                  &larr;
+                </button>
+                <button
+                  onClick={() => movePhoto(idx, 1)}
+                  disabled={idx === photos.length - 1}
+                  className="w-6 h-6 rounded-full bg-black/60 text-white text-xs leading-none flex items-center justify-center disabled:opacity-30"
+                  aria-label="Move right"
+                >
+                  &rarr;
+                </button>
+              </div>
               <button
                 onClick={() => removePhoto(url)}
                 className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white text-xs leading-none flex items-center justify-center"
@@ -125,7 +165,7 @@ export default function Onboarding({ userId, dob, initial, onDone }: Props) {
           className="hidden"
           onChange={(e) => handleFiles(e.target.files)}
         />
-        <p className="text-xs text-[var(--muted)] mt-2">First photo is your headline. 1&ndash;6 photos.</p>
+        <p className="text-xs text-[var(--muted)] mt-2">First photo is your headline &mdash; use the arrows to reorder. 1&ndash;6 photos.</p>
       </Section>
 
       <Section label="Display name">
@@ -182,6 +222,11 @@ export default function Onboarding({ userId, dob, initial, onDone }: Props) {
       </Section>
 
       {error && <p className="text-[var(--error)] text-sm mb-3">{error}</p>}
+      {!canSave && missing.length > 0 && (
+        <p className="text-xs text-[var(--muted)] mt-4 text-center">
+          Still need: {missing.join(' · ')}
+        </p>
+      )}
 
       <button
         onClick={handleSave}

@@ -50,8 +50,16 @@ export default function Chat({ me, aId, bId, otherName, onNavigate }: Props) {
     }
   }, [aId, bId, me.userId])
 
+  const didInitialScroll = useRef(false)
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
+    const el = scrollRef.current
+    if (!el) return
+    // First time we have any messages on this chat, jump instantly so the
+    // user lands at the bottom instead of watching the view scroll from
+    // top to bottom. Every subsequent message animates.
+    const behavior: ScrollBehavior = didInitialScroll.current ? 'smooth' : 'auto'
+    el.scrollTo({ top: el.scrollHeight, behavior })
+    if (messages.length > 0) didInitialScroll.current = true
   }, [messages])
 
   async function handleSend() {
