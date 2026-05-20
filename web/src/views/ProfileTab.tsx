@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Profile, View } from '../types'
 import { app } from '../lib/app'
 import { ageFromDob } from '../lib/photos'
 import { loadPrefs, savePrefs, type Preferences, DEFAULT_PREFS } from '../lib/prefs'
 import { getNotificationPermission, requestNotificationPermission } from '../lib/realtime'
+import { useInstallPrompt, isStandalone } from '../lib/install'
 import { seedDemoProfiles } from '../lib/seed'
 import Onboarding from './Onboarding'
 
@@ -23,6 +24,8 @@ export default function ProfileTab({ me, onUpdated, onPrefsChanged, onNavigate }
   const [prefsLoaded, setPrefsLoaded] = useState(false)
   const [notifPerm, setNotifPerm] = useState<NotificationPermission | 'unsupported'>(getNotificationPermission())
   const [seedStatus, setSeedStatus] = useState<string | null>(null)
+  const { canInstall, prompt } = useInstallPrompt()
+  const installed = isStandalone()
 
   useEffect(() => {
     let cancelled = false
@@ -30,7 +33,15 @@ export default function ProfileTab({ me, onUpdated, onPrefsChanged, onNavigate }
     return () => { cancelled = true }
   }, [])
 
-  async function patchPrefs(patch: Partial<Preferences>) {
+  // Slider input.onChange fires on every value tick — without debouncing,
+  // dragging from 5km to 500km would hammer ~100 savePrefs + onPrefsChanged
+  // calls (each of which makes Discover refetch). Defer both side effects
+  // to ~400ms after the last drag tick; local state updates immediately so
+  // the slider still feels responsive.
+  const commitTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => { if (commitTimer.current) clearTimeout(commitTimer.current) }, [])
+
+  function patchPrefs(patch: Partial<Preferences>) {
     // Enforce minAge < maxAge by adjusting the opposite end when one crosses
     // the line. Without this, dragging minAge above maxAge leaves the state
     // inconsistent (because the maxAge slider's `min` attribute clamps the
@@ -42,8 +53,11 @@ export default function ProfileTab({ me, onUpdated, onPrefsChanged, onNavigate }
       else next.minAge = Math.max(18, next.maxAge - 1)
     }
     setPrefs(next)
-    onPrefsChanged()
-    try { await savePrefs(next) } catch { /* swallow; will re-sync on next load */ }
+    if (commitTimer.current) clearTimeout(commitTimer.current)
+    commitTimer.current = setTimeout(() => {
+      onPrefsChanged()
+      savePrefs(next).catch(() => { /* swallow; will re-sync on next load */ })
+    }, 400)
   }
 
   if (editing) {
@@ -107,9 +121,23 @@ export default function ProfileTab({ me, onUpdated, onPrefsChanged, onNavigate }
             <span className="text-[var(--success)] font-semibold text-sm flex-shrink-0">On</span>
           )}
         </div>
-        <p className="text-xs text-[var(--muted)] mt-3">
-          Install Dating to your home screen for the full app experience &mdash; chats stay in sync, no tab to keep open.
-        </p>
+        {!installed && (
+          <div className="mt-3 pt-3 border-t border-[var(--line)] flex items-center justify-between gap-3">
+            <p className="text-xs text-[var(--muted)] flex-1">
+              {canInstall
+                ? 'Install Dating to your home screen for the full app experience.'
+                : 'Add to home screen via your browser&rsquo;s share menu for the full app experience.'}
+            </p>
+            {canInstall && (
+              <button
+                onClick={() => prompt()}
+                className="rounded-full bg-[var(--accent)] text-white font-semibold px-4 py-2 text-sm flex-shrink-0"
+              >
+                Install
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       <h3 className="display-font text-xl mt-8 mb-2">Discovery</h3>

@@ -313,8 +313,8 @@ function MatchOverlay({ me, other, onClose }: { me: Profile; other: Candidate; o
       <h2 className="display-font text-5xl mb-2">It&rsquo;s a match!</h2>
       <p className="mb-10 opacity-90">You and {other.displayName} liked each other.</p>
       <div className="flex gap-6 mb-12">
-        <Avatar src={me.photos[0]} />
-        <Avatar src={other.photos[0]} />
+        <Avatar src={me.photos[0]} name={me.displayName} />
+        <Avatar src={other.photos[0]} name={other.displayName} />
       </div>
       <button
         onClick={onClose}
@@ -326,10 +326,14 @@ function MatchOverlay({ me, other, onClose }: { me: Profile; other: Candidate; o
   )
 }
 
-function Avatar({ src }: { src: string | undefined }) {
+function Avatar({ src, name }: { src: string | undefined; name: string }) {
+  const [broken, setBroken] = useState(false)
+  const initial = (name || '?').trim().charAt(0).toUpperCase()
   return (
-    <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-white bg-white/20">
-      {src && <img src={src} alt="" className="w-full h-full object-cover" />}
+    <div className="w-28 h-28 rounded-full overflow-hidden border-4 border-white bg-white/20 flex items-center justify-center text-4xl font-bold">
+      {src && !broken
+        ? <img src={src} alt="" className="w-full h-full object-cover" onError={() => setBroken(true)} />
+        : <span>{initial}</span>}
     </div>
   )
 }
