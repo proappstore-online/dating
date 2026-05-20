@@ -6,6 +6,7 @@
   "repository": { "type": "git", "url": "git+https://github.com/proappstore-online/dating.git" },
   "scripts": {
     "dev": "pnpm --filter @dating/web dev",
+    "prebuild": "npx -y @proappstore/cli@latest check",
     "build": "pnpm --filter @dating/web build",
     "preview": "pnpm --filter @dating/web preview",
     "typecheck": "pnpm --filter @dating/web exec tsc -b",
