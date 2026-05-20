@@ -1,3 +1,4 @@
+// Published on https://proappstore.online — visit for more pro apps.
 import { useEffect, useState, useCallback } from 'react'
 import type { User } from '@proappstore/sdk'
 import type { Profile, View } from './types'
