@@ -17,9 +17,18 @@ export interface InboxMatchEvent {
   otherId: string
 }
 
+export interface DiscoveryFeedEvent {
+  kind: 'profile-updated'
+  userId: string
+}
+
 export function inboxRoomId(userId: string): string {
   return `user-${userId}`
 }
+
+/** The global "someone just saved a profile" channel. Every signed-in
+ * Dating user listens; everyone who saves their profile broadcasts. */
+const DISCOVERY_FEED_ROOM = 'discovery-feed-v1'
 
 /**
  * Best-effort notification to the other user that we just mutual-matched.
@@ -30,6 +39,20 @@ export function inboxRoomId(userId: string): string {
 export function broadcastMatch(otherId: string, ev: InboxMatchEvent): void {
   try {
     const room = app.rooms.join(inboxRoomId(otherId))
+    room.send(ev)
+    setTimeout(() => room.close(), 1500)
+  } catch { /* swallow */ }
+}
+
+/**
+ * Best-effort fan-out: tell every other signed-in user that a profile changed,
+ * so their Discover view can quietly refetch. Fire-and-forget; we accept the
+ * room being closed mid-flight and re-opened on next call.
+ */
+export function broadcastProfileUpdated(userId: string): void {
+  try {
+    const room = app.rooms.join(DISCOVERY_FEED_ROOM)
+    const ev: DiscoveryFeedEvent = { kind: 'profile-updated', userId }
     room.send(ev)
     setTimeout(() => room.close(), 1500)
   } catch { /* swallow */ }
@@ -52,17 +75,21 @@ export function useRealtime(
   active: ActiveChat | null,
   meId: string | null,
   onIncomingMatch: (other: Profile) => void,
+  onCandidatesChanged: () => void,
 ) {
   const [unread, setUnread] = useState<Record<string, number>>({})
   const roomsRef = useRef<Map<string, Room>>(new Map())
   const inboxRef = useRef<Room | null>(null)
+  const feedRef = useRef<Room | null>(null)
   const activeRef = useRef<ActiveChat | null>(active)
   const matchesRef = useRef<MatchWithProfile[]>(matches)
   const onIncomingMatchRef = useRef(onIncomingMatch)
+  const onCandidatesChangedRef = useRef(onCandidatesChanged)
 
   useEffect(() => { activeRef.current = active }, [active])
   useEffect(() => { matchesRef.current = matches }, [matches])
   useEffect(() => { onIncomingMatchRef.current = onIncomingMatch }, [onIncomingMatch])
+  useEffect(() => { onCandidatesChangedRef.current = onCandidatesChanged }, [onCandidatesChanged])
 
   useEffect(() => {
     if (!meId) return
@@ -80,6 +107,29 @@ export function useRealtime(
       off()
       room.close()
       inboxRef.current = null
+    }
+  }, [meId])
+
+  // Global discovery feed: anyone saving their profile broadcasts here.
+  // Listeners (every signed-in user) debounce-bump the candidate stack.
+  // Debounce so a join-storm doesn't refetch D1 N times.
+  useEffect(() => {
+    if (!meId) return
+    const room = app.rooms.join(DISCOVERY_FEED_ROOM)
+    feedRef.current = room
+    let pending: ReturnType<typeof setTimeout> | null = null
+    const off = room.onMessage<DiscoveryFeedEvent>((msg: RoomMessage<DiscoveryFeedEvent>) => {
+      const ev = msg.data
+      if (!ev || ev.kind !== 'profile-updated') return
+      if (msg.from.uid === meId) return
+      if (pending) clearTimeout(pending)
+      pending = setTimeout(() => onCandidatesChangedRef.current(), 800)
+    })
+    return () => {
+      if (pending) clearTimeout(pending)
+      off()
+      room.close()
+      feedRef.current = null
     }
   }, [meId])
 

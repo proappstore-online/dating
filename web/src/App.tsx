@@ -4,7 +4,7 @@ import type { User } from '@proappstore/sdk'
 import type { Profile, View } from './types'
 import { app } from './lib/app'
 import { getMyProfile, loadMatches, type MatchWithProfile } from './lib/db'
-import { useRealtime } from './lib/realtime'
+import { useRealtime, broadcastProfileUpdated } from './lib/realtime'
 import SignIn from './views/SignIn'
 import AgeGate from './views/AgeGate'
 import Onboarding from './views/Onboarding'
@@ -122,6 +122,8 @@ export default function App() {
         onDone={async () => {
           const me = await getMyProfile(stage.user.id)
           if (me) setStage({ name: 'ready', user: stage.user, me })
+          // Tell everyone else's Discover: there's a new face in the pool.
+          broadcastProfileUpdated(stage.user.id)
         }}
       />
     )
@@ -151,21 +153,28 @@ function Ready({
 
   const [incomingMatch, setIncomingMatch] = useState<Profile | null>(null)
   const activeChat = view.name === 'chat' ? { aId: view.aId, bId: view.bId } : null
-  const { unread, clearUnread } = useRealtime(matches, activeChat, me.userId, (other) => {
-    refreshMatches()
-    setIncomingMatch(other)
-  })
+
+  // Bumped whenever something happens that should invalidate Discover's
+  // candidate stack: prefs change (widened radius / age), profile edited,
+  // admirer count changed via a fresh match, or somebody else saved their
+  // profile (delivered through the global discovery-feed room).
+  const [discoverEpoch, setDiscoverEpoch] = useState(0)
+  const bumpDiscover = useCallback(() => setDiscoverEpoch((e) => e + 1), [])
+
+  const { unread, clearUnread } = useRealtime(
+    matches,
+    activeChat,
+    me.userId,
+    (other) => {
+      refreshMatches()
+      setIncomingMatch(other)
+    },
+    bumpDiscover,
+  )
 
   useEffect(() => {
     if (view.name === 'chat') clearUnread(view.aId, view.bId)
   }, [view, clearUnread])
-
-  // Bumped whenever something happens that should invalidate Discover's
-  // candidate stack: prefs change (widened radius / age), profile edited,
-  // or admirer count changed via a fresh match. Discover keeps its state
-  // (the swipe stack) across tab switches, but re-fetches when this ticks.
-  const [discoverEpoch, setDiscoverEpoch] = useState(0)
-  const bumpDiscover = useCallback(() => setDiscoverEpoch((e) => e + 1), [])
 
   const totalUnread = Object.values(unread).reduce((a, b) => a + b, 0)
 
@@ -191,7 +200,11 @@ function Ready({
         <div className={view.name === 'profile' ? '' : 'hidden'}>
           <ProfileTab
             me={me}
-            onUpdated={(next) => { onProfileUpdate(next); bumpDiscover() }}
+            onUpdated={(next) => {
+              onProfileUpdate(next)
+              bumpDiscover()
+              broadcastProfileUpdated(me.userId)
+            }}
             onPrefsChanged={bumpDiscover}
             onNavigate={setView}
           />
