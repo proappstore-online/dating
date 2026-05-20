@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import type { Profile, Gender, LookingFor } from '../types'
 import { saveProfile } from '../lib/db'
-import { uploadProfilePhoto, ageFromDob } from '../lib/photos'
+import { uploadProfilePhoto, deleteProfilePhoto, ageFromDob } from '../lib/photos'
 
 interface Props {
   userId: string
@@ -72,6 +72,9 @@ export default function Onboarding({ userId, dob, initial, onDone }: Props) {
 
   function removePhoto(url: string) {
     setPhotos((p) => p.filter((u) => u !== url))
+    // Fire-and-forget. If save fails or user closes the tab mid-delete
+    // we don't really care — the URL is already off the profile.
+    deleteProfilePhoto(url)
   }
 
   function movePhoto(idx: number, dir: -1 | 1) {

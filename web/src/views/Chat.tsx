@@ -128,20 +128,34 @@ export default function Chat({ me, aId, bId, otherName, onNavigate }: Props) {
 
       <form
         onSubmit={(e) => { e.preventDefault(); handleSend() }}
-        className="flex gap-2 p-3 border-t border-[var(--line)] bg-[var(--paper)]"
+        className="flex gap-2 p-3 border-t border-[var(--line)] bg-[var(--paper)] items-end"
         style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
       >
-        <input
+        <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            // Enter sends; Shift+Enter inserts a newline. Hardware-keyboard
+            // users get the expected chat-app default.
+            if (e.key === 'Enter' && !e.shiftKey) {
+              e.preventDefault()
+              handleSend()
+            }
+          }}
           placeholder="Message…"
           maxLength={1000}
-          className="flex-1 rounded-full bg-[var(--accent-soft)] px-4 py-2.5 text-base outline-none"
+          rows={1}
+          ref={(el) => {
+            if (!el) return
+            el.style.height = 'auto'
+            el.style.height = Math.min(el.scrollHeight, 5 * 24 + 20) + 'px'
+          }}
+          className="flex-1 rounded-2xl bg-[var(--accent-soft)] px-4 py-2.5 text-base outline-none resize-none leading-6 min-h-[2.5rem] max-h-32"
         />
         <button
           type="submit"
           disabled={!text.trim() || sending}
-          className="rounded-full bg-[var(--accent)] text-white font-semibold px-5 disabled:opacity-40"
+          className="rounded-full bg-[var(--accent)] text-white font-semibold px-5 h-10 disabled:opacity-40"
         >
           Send
         </button>

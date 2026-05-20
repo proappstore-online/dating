@@ -160,23 +160,42 @@ function Ready({
     if (view.name === 'chat') clearUnread(view.aId, view.bId)
   }, [view, clearUnread])
 
+  // Bumped whenever something happens that should invalidate Discover's
+  // candidate stack: prefs change (widened radius / age), profile edited,
+  // or admirer count changed via a fresh match. Discover keeps its state
+  // (the swipe stack) across tab switches, but re-fetches when this ticks.
+  const [discoverEpoch, setDiscoverEpoch] = useState(0)
+  const bumpDiscover = useCallback(() => setDiscoverEpoch((e) => e + 1), [])
+
   const totalUnread = Object.values(unread).reduce((a, b) => a + b, 0)
 
   if (view.name === 'chat') {
     return <Chat me={me} aId={view.aId} bId={view.bId} otherName={view.otherName} onNavigate={setView} />
   }
 
+  // Tabs stay mounted (display: none when inactive) so the swipe stack
+  // survives a quick "check messages and come back" trip without
+  // re-fetching from D1 every time.
   return (
     <div className="flex flex-col h-dvh">
       <main className="flex-1 overflow-y-auto">
-        {view.name === 'discover' && <Discover me={me} onMatched={refreshMatches} onNavigate={setView} />}
-        {view.name === 'admirers' && <Admirers me={me} onNavigate={setView} />}
-        {view.name === 'matches' && (
+        <div className={view.name === 'discover' ? 'h-full' : 'hidden'}>
+          <Discover me={me} epoch={discoverEpoch} onMatched={() => { refreshMatches(); bumpDiscover() }} onNavigate={setView} />
+        </div>
+        <div className={view.name === 'admirers' ? '' : 'hidden'}>
+          <Admirers me={me} onNavigate={setView} />
+        </div>
+        <div className={view.name === 'matches' ? '' : 'hidden'}>
           <Matches me={me} matches={matches} unread={unread} onNavigate={setView} />
-        )}
-        {view.name === 'profile' && (
-          <ProfileTab me={me} onUpdated={onProfileUpdate} onNavigate={setView} />
-        )}
+        </div>
+        <div className={view.name === 'profile' ? '' : 'hidden'}>
+          <ProfileTab
+            me={me}
+            onUpdated={(next) => { onProfileUpdate(next); bumpDiscover() }}
+            onPrefsChanged={bumpDiscover}
+            onNavigate={setView}
+          />
+        </div>
       </main>
       <BottomNav active={view.name} unread={totalUnread} onChange={(n) => setView({ name: n } as View)} />
       {incomingMatch && (
@@ -263,17 +282,22 @@ function Tab({
   return (
     <button
       onClick={onClick}
-      className={`flex-1 py-3 flex flex-col items-center gap-0.5 text-xs relative ${
+      className={`flex-1 py-2 flex flex-col items-center gap-0.5 text-xs relative transition-colors ${
         current ? 'text-[var(--accent)]' : 'text-[var(--muted)]'
       }`}
     >
-      <span className="text-xl relative" dangerouslySetInnerHTML={{ __html: icon }} />
+      <span
+        className={`text-xl relative w-14 h-7 flex items-center justify-center rounded-full transition-all ${
+          current ? 'bg-[var(--accent-soft)] scale-100' : 'scale-95'
+        }`}
+        dangerouslySetInnerHTML={{ __html: icon }}
+      />
       {badge != null && badge > 0 && (
-        <span className="absolute top-1.5 right-1/2 translate-x-5 bg-[var(--accent)] text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center">
+        <span className="absolute top-1.5 right-1/2 translate-x-7 bg-[var(--accent)] text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center ring-2 ring-[var(--paper)]">
           {badge > 99 ? '99+' : badge}
         </span>
       )}
-      <span>{label}</span>
+      <span className={`transition-opacity ${current ? 'font-semibold' : ''}`}>{label}</span>
     </button>
   )
 }

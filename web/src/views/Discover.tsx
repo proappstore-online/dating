@@ -8,6 +8,8 @@ import { broadcastMatch } from '../lib/realtime'
 
 interface Props {
   me: Profile
+  /** Bumped by parent when something invalidates the stack (prefs change, etc.). */
+  epoch: number
   onMatched: () => void
   onNavigate: (v: View) => void
 }
@@ -15,7 +17,7 @@ interface Props {
 const THRESHOLD = 120
 const FLY_OUT = 700
 
-export default function Discover({ me, onMatched, onNavigate }: Props) {
+export default function Discover({ me, epoch, onMatched, onNavigate }: Props) {
   const [stack, setStack] = useState<Candidate[]>([])
   const [loading, setLoading] = useState(true)
   const [matched, setMatched] = useState<Candidate | null>(null)
@@ -41,7 +43,7 @@ export default function Discover({ me, onMatched, onNavigate }: Props) {
       }
     })()
     return () => { cancelled = true }
-  }, [me])
+  }, [me, epoch])
 
   async function handleSwipe(target: Candidate, direction: SwipeDirection) {
     setStack((s) => s.filter((p) => p.userId !== target.userId))

@@ -10,6 +10,27 @@ export async function uploadProfilePhoto(userId: string, file: File): Promise<st
   return app.storage.publicUrl(path)
 }
 
+/**
+ * Best-effort delete of a photo at its public URL. Only deletes photos
+ * that look like ours (right host + path prefix) — third-party URLs or
+ * data: URLs from seed profiles pass through silently.
+ *
+ * We don't surface errors: if the delete fails the URL is already gone
+ * from the user's profile so they don't care, and a stuck R2 object is
+ * cheap.
+ */
+export async function deleteProfilePhoto(url: string): Promise<void> {
+  try {
+    const parsed = new URL(url)
+    // Public URL form: /v1/apps/{appId}/public/{path}
+    const m = parsed.pathname.match(/^\/v1\/apps\/[^/]+\/public\/(.+)$/)
+    if (!m) return
+    await app.storage.delete(`_public/${m[1]}`)
+  } catch {
+    // swallow — orphan R2 objects are cheaper than blocking a remove
+  }
+}
+
 async function downscaleImage(file: File): Promise<Blob> {
   const bitmap = await createImageBitmap(file)
   try {

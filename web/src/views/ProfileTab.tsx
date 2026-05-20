@@ -13,10 +13,11 @@ const SEED_ENABLED = typeof window !== 'undefined' &&
 interface Props {
   me: Profile
   onUpdated: (next: Profile) => void
+  onPrefsChanged: () => void
   onNavigate: (v: View) => void
 }
 
-export default function ProfileTab({ me, onUpdated, onNavigate }: Props) {
+export default function ProfileTab({ me, onUpdated, onPrefsChanged, onNavigate }: Props) {
   const [editing, setEditing] = useState(false)
   const [prefs, setPrefs] = useState<Preferences>(DEFAULT_PREFS)
   const [prefsLoaded, setPrefsLoaded] = useState(false)
@@ -41,6 +42,7 @@ export default function ProfileTab({ me, onUpdated, onNavigate }: Props) {
       else next.minAge = Math.max(18, next.maxAge - 1)
     }
     setPrefs(next)
+    onPrefsChanged()
     try { await savePrefs(next) } catch { /* swallow; will re-sync on next load */ }
   }
 
