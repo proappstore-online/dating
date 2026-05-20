@@ -199,6 +199,9 @@ function Card({
 
   const scaleClass = isTop ? '' : 'scale-95 opacity-90'
   const photo = profile.photos[photoIdx] ?? null
+  const [imageBroken, setImageBroken] = useState(false)
+  useEffect(() => { setImageBroken(false) }, [photo])
+  const initial = (profile.displayName || '?').trim().charAt(0).toUpperCase()
 
   return (
     <div
@@ -215,10 +218,21 @@ function Card({
       onPointerCancel={handleEnd}
       onClick={tapPhoto}
     >
-      {photo ? (
-        <img src={photo} alt="" className="absolute inset-0 w-full h-full object-cover" draggable={false} />
+      {photo && !imageBroken ? (
+        <img
+          src={photo}
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover"
+          draggable={false}
+          onError={() => setImageBroken(true)}
+        />
       ) : (
-        <div className="absolute inset-0 flex items-center justify-center text-6xl text-[var(--muted)]">?</div>
+        <div
+          className="absolute inset-0 flex items-center justify-center text-7xl font-bold text-white"
+          style={{ background: `linear-gradient(135deg, hsl(${(profile.displayName.charCodeAt(0) || 200) * 7 % 360}, 60%, 55%), hsl(${(profile.displayName.charCodeAt(0) || 200) * 7 % 360 + 40}, 50%, 45%))` }}
+        >
+          {initial}
+        </div>
       )}
 
       {profile.photos.length > 1 && (

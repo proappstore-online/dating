@@ -30,7 +30,16 @@ export default function ProfileTab({ me, onUpdated, onNavigate }: Props) {
   }, [])
 
   async function patchPrefs(patch: Partial<Preferences>) {
+    // Enforce minAge < maxAge by adjusting the opposite end when one crosses
+    // the line. Without this, dragging minAge above maxAge leaves the state
+    // inconsistent (because the maxAge slider's `min` attribute clamps the
+    // displayed value to minAge+1 but never fires onChange), and the
+    // candidate query returns zero rows forever.
     const next = { ...prefs, ...patch }
+    if (next.minAge > next.maxAge - 1) {
+      if ('minAge' in patch) next.maxAge = Math.min(80, next.minAge + 1)
+      else next.minAge = Math.max(18, next.maxAge - 1)
+    }
     setPrefs(next)
     try { await savePrefs(next) } catch { /* swallow; will re-sync on next load */ }
   }

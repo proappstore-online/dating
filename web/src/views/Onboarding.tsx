@@ -53,9 +53,14 @@ export default function Onboarding({ userId, dob, initial, onDone }: Props) {
     setError(null)
     try {
       const slots = 6 - photos.length
-      for (const file of Array.from(files).slice(0, slots)) {
+      const picked = Array.from(files).slice(0, slots)
+      const skipped = files.length - picked.length
+      for (const file of picked) {
         const url = await uploadProfilePhoto(userId, file)
         setPhotos((p) => [...p, url])
+      }
+      if (skipped > 0) {
+        setError(`Only the first ${picked.length} added — 6-photo limit. ${skipped} skipped.`)
       }
     } catch (e) {
       setError('Upload failed: ' + (e as Error).message)

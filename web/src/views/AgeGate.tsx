@@ -46,7 +46,8 @@ export default function AgeGate({ onSet }: Props) {
         value={dob}
         onChange={(e) => setDob(e.target.value)}
         max={new Date().toISOString().slice(0, 10)}
-        className="w-full max-w-xs rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-base text-center"
+        disabled={saving}
+        className="w-full max-w-xs rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-base text-center disabled:opacity-60"
       />
       {age != null && (
         <p className={`text-xs mt-2 ${age >= 18 && age <= 120 ? 'text-[var(--muted)]' : 'text-[var(--error)]'}`}>
