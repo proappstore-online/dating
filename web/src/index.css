@@ -40,4 +40,52 @@ body {
 }
 #root { min-height: 100dvh; }
 .display-font { font-family: 'Fraunces', Georgia, serif; letter-spacing: -0.04em; }
+
+/*
+ * Phone-frame on wider screens. The app is mobile-first; on desktop we
+ * center it in a 440px-wide column so the swipe stack doesn't fly across
+ * a 27" monitor. The surrounding `body` shows a soft brand wash so the
+ * narrow column doesn't look like a broken layout.
+ *
+ * `dvh` on the inner frame keeps the in-app layout exactly as it is on
+ * phones (no scrolling tricks); the outer body just absorbs the rest
+ * of the viewport.
+ */
+@media (min-width: 768px) {
+  body {
+    background:
+      radial-gradient(at 20% 10%, color-mix(in oklab, var(--accent) 14%, transparent), transparent 55%),
+      radial-gradient(at 80% 90%, color-mix(in oklab, var(--accent) 8%, transparent), transparent 60%),
+      var(--paper);
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+    padding: max(env(safe-area-inset-top), 1.5rem) 1.5rem max(env(safe-area-inset-bottom), 1.5rem);
+  }
+  #root {
+    width: 100%;
+    max-width: 440px;
+    min-height: calc(100dvh - 3rem);
+    max-height: calc(100dvh - 3rem);
+    background: var(--paper);
+    border-radius: 28px;
+    box-shadow:
+      0 30px 80px -20px rgba(225, 29, 72, 0.18),
+      0 6px 14px -4px rgba(0, 0, 0, 0.12),
+      0 0 0 1px rgba(0, 0, 0, 0.04);
+    overflow: hidden;
+    position: relative;
+    isolation: isolate;
+  }
+}
+
+/*
+ * The app uses `h-dvh` on a few full-screen views (Chat, the BottomNav
+ * shell). Inside the phone-frame those need to be the frame height, not
+ * the window height, otherwise the chat overflows the rounded corners.
+ */
+@media (min-width: 768px) {
+  #root .h-dvh { height: 100%; }
+  #root .min-h-dvh { min-height: 100%; }
+}
 } /* end @layer base */

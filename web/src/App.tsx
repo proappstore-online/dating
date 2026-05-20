@@ -70,7 +70,12 @@ export default function App() {
   }, [])
 
   if (stage.name === 'booting') {
-    return <div className="min-h-dvh flex items-center justify-center text-[var(--muted)]">Loading…</div>
+    return (
+      <div className="min-h-dvh flex flex-col items-center justify-center px-6">
+        <div className="text-6xl mb-3 animate-pulse" aria-hidden="true">&#10084;</div>
+        <p className="text-sm text-[var(--muted)]">Warming up…</p>
+      </div>
+    )
   }
   if (stage.name === 'signin') {
     return <SignIn />

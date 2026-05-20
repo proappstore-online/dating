@@ -63,17 +63,47 @@ export default function Discover({ me, onMatched, onNavigate }: Props) {
   }
 
   if (loading) {
-    return <CenteredMessage>Looking around…</CenteredMessage>
+    return (
+      <div className="relative h-full w-full flex flex-col">
+        <div className="relative flex-1 flex items-center justify-center px-4 pb-4">
+          <div className="absolute inset-4 rounded-3xl bg-[var(--accent-soft)] animate-pulse" />
+          <div className="absolute inset-4 rounded-3xl bg-gradient-to-t from-black/10 via-transparent to-transparent" />
+          <p className="relative text-sm text-[var(--muted)]">Looking around…</p>
+        </div>
+        <div className="flex justify-center gap-6 pb-6">
+          <div className="w-16 h-16 rounded-full bg-[var(--accent-soft)] animate-pulse" />
+          <div className="w-16 h-16 rounded-full bg-[var(--accent-soft)] animate-pulse" />
+        </div>
+      </div>
+    )
   }
   if (error) {
-    return <CenteredMessage>Trouble loading: {error}</CenteredMessage>
+    return (
+      <CenteredMessage>
+        <div className="text-5xl mb-3">&#9888;</div>
+        <p className="text-lg mb-1">Couldn&rsquo;t load profiles.</p>
+        <p className="text-sm text-[var(--muted)] mb-5 max-w-xs">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="rounded-full bg-[var(--ink)] text-[var(--paper)] font-semibold px-6 py-2.5 text-sm active:scale-95 transition"
+        >
+          Try again
+        </button>
+      </CenteredMessage>
+    )
   }
   if (stack.length === 0) {
     return (
       <CenteredMessage>
         <div className="text-6xl mb-4">&#9728;</div>
         <p className="text-lg mb-1">That&rsquo;s everyone for now.</p>
-        <p className="text-sm text-[var(--muted)]">Check back soon for new people nearby.</p>
+        <p className="text-sm text-[var(--muted)] mb-5 max-w-xs">Try widening your distance or age range in Profile, or check back soon for new people nearby.</p>
+        <button
+          onClick={() => onNavigate({ name: 'profile' })}
+          className="rounded-full border border-[var(--line)] px-6 py-2.5 text-sm active:scale-95 transition"
+        >
+          Open discovery settings
+        </button>
       </CenteredMessage>
     )
   }

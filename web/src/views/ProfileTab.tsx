@@ -72,28 +72,33 @@ export default function ProfileTab({ me, onUpdated, onNavigate }: Props) {
       <Row label="Photos" value={`${me.photos.length} uploaded`} />
 
       <h3 className="display-font text-xl mt-8 mb-2">Notifications</h3>
-      <div className="rounded-2xl border border-[var(--line)] p-4 bg-white flex items-center justify-between gap-3">
-        <div className="text-sm">
-          {notifPerm === 'granted' && 'On — you&rsquo;ll hear about new messages.'}
-          {notifPerm === 'denied' && (
-            <span className="text-[var(--muted)]">Blocked in browser settings.</span>
+      <div className="rounded-2xl border border-[var(--line)] p-4 bg-white">
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-sm">
+            {notifPerm === 'granted' && 'On — pings while Dating is open in any tab.'}
+            {notifPerm === 'denied' && (
+              <span className="text-[var(--muted)]">Blocked in browser settings.</span>
+            )}
+            {notifPerm === 'default' && 'Get pinged when someone messages you.'}
+            {notifPerm === 'unsupported' && (
+              <span className="text-[var(--muted)]">Not supported in this browser.</span>
+            )}
+          </div>
+          {notifPerm === 'default' && (
+            <button
+              onClick={async () => setNotifPerm(await requestNotificationPermission())}
+              className="rounded-full bg-[var(--ink)] text-[var(--paper)] font-semibold px-4 py-2 text-sm flex-shrink-0"
+            >
+              Enable
+            </button>
           )}
-          {notifPerm === 'default' && 'Get pinged when someone messages you.'}
-          {notifPerm === 'unsupported' && (
-            <span className="text-[var(--muted)]">Not supported in this browser.</span>
+          {notifPerm === 'granted' && (
+            <span className="text-[var(--success)] font-semibold text-sm flex-shrink-0">On</span>
           )}
         </div>
-        {notifPerm === 'default' && (
-          <button
-            onClick={async () => setNotifPerm(await requestNotificationPermission())}
-            className="rounded-full bg-[var(--ink)] text-[var(--paper)] font-semibold px-4 py-2 text-sm flex-shrink-0"
-          >
-            Enable
-          </button>
-        )}
-        {notifPerm === 'granted' && (
-          <span className="text-[var(--success)] font-semibold text-sm flex-shrink-0">On</span>
-        )}
+        <p className="text-xs text-[var(--muted)] mt-3">
+          Install Dating to your home screen for the full app experience &mdash; chats stay in sync, no tab to keep open.
+        </p>
       </div>
 
       <h3 className="display-font text-xl mt-8 mb-2">Discovery</h3>
