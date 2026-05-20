@@ -62,6 +62,14 @@ export default function AgeGate({ onSet }: Props) {
       >
         {saving ? 'Saving…' : 'Confirm'}
       </button>
+
+      <button
+        onClick={() => app.auth.signOut()}
+        disabled={saving}
+        className="mt-4 text-sm text-[var(--muted)] hover:text-[var(--ink)] underline disabled:opacity-50"
+      >
+        Sign out
+      </button>
     </div>
   )
 }
