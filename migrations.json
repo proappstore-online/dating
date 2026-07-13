@@ -1,0 +1,12 @@
+{
+  "migrations": [
+    {
+      "name": "0001_init",
+      "sql": "CREATE TABLE IF NOT EXISTS profiles ( user_id TEXT PRIMARY KEY, display_name TEXT NOT NULL, dob TEXT NOT NULL, bio TEXT NOT NULL DEFAULT '', gender TEXT NOT NULL, looking_for TEXT NOT NULL, photos_json TEXT NOT NULL DEFAULT '[]', lat REAL, lng REAL, updated_at INTEGER NOT NULL ); CREATE INDEX IF NOT EXISTS idx_profiles_updated ON profiles(updated_at DESC); CREATE TABLE IF NOT EXISTS swipes ( swiper_id TEXT NOT NULL, target_id TEXT NOT NULL, direction TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (swiper_id, target_id) ); CREATE INDEX IF NOT EXISTS idx_swipes_target ON swipes(target_id, direction); CREATE TABLE IF NOT EXISTS matches ( a_id TEXT NOT NULL, b_id TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (a_id, b_id) ); CREATE INDEX IF NOT EXISTS idx_matches_a ON matches(a_id, created_at DESC); CREATE INDEX IF NOT EXISTS idx_matches_b ON matches(b_id, created_at DESC); CREATE TABLE IF NOT EXISTS messages ( id TEXT PRIMARY KEY, match_a TEXT NOT NULL, match_b TEXT NOT NULL, sender_id TEXT NOT NULL, body TEXT NOT NULL, created_at INTEGER NOT NULL ); CREATE INDEX IF NOT EXISTS idx_messages_match ON messages(match_a, match_b, created_at);"
+    },
+    {
+      "name": "0002_safety",
+      "sql": "CREATE TABLE IF NOT EXISTS blocks ( blocker_id TEXT NOT NULL, blocked_id TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (blocker_id, blocked_id) ); CREATE INDEX IF NOT EXISTS idx_blocks_blocked ON blocks(blocked_id); CREATE TABLE IF NOT EXISTS reports ( id TEXT PRIMARY KEY, reporter_id TEXT NOT NULL, reported_id TEXT NOT NULL, reason TEXT NOT NULL, note TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL ); CREATE INDEX IF NOT EXISTS idx_reports_reported ON reports(reported_id, created_at DESC);"
+    }
+  ]
+}
