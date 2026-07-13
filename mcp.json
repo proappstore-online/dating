@@ -1,0 +1,316 @@
+{
+  "tools": [
+    {
+      "name": "get_profile",
+      "description": "Public profile card (name, photos, bio, gender, distance basis) for one user by id — the same data shown on swipe cards and match previews",
+      "operation": "query",
+      "sql": "SELECT * FROM profiles WHERE user_id = :user_id",
+      "params": {
+        "user_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "save_my_profile",
+      "description": "Create or update the caller's own dating profile (identity is server-derived; a client can never write another user's profile)",
+      "operation": "execute",
+      "sql": "INSERT INTO profiles (user_id, display_name, dob, bio, gender, looking_for, photos_json, lat, lng, updated_at) VALUES (:__user_id, :display_name, :dob, :bio, :gender, :looking_for, :photos_json, :lat, :lng, :updated_at) ON CONFLICT(user_id) DO UPDATE SET display_name = excluded.display_name, dob = excluded.dob, bio = excluded.bio, gender = excluded.gender, looking_for = excluded.looking_for, photos_json = excluded.photos_json, lat = excluded.lat, lng = excluded.lng, updated_at = excluded.updated_at",
+      "params": {
+        "display_name": {
+          "type": "string"
+        },
+        "dob": {
+          "type": "string"
+        },
+        "bio": {
+          "type": "string"
+        },
+        "gender": {
+          "type": "string"
+        },
+        "looking_for": {
+          "type": "string"
+        },
+        "photos_json": {
+          "type": "string"
+        },
+        "lat": {
+          "type": "number",
+          "optional": true
+        },
+        "lng": {
+          "type": "number",
+          "optional": true
+        },
+        "updated_at": {
+          "type": "integer"
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "load_candidates",
+      "description": "Swipeable candidate pool for the caller: profiles matching the requested orientation, not yet swiped by the caller, and with no block in either direction. Age/distance narrowing happens client-side.",
+      "operation": "query",
+      "sql": "SELECT p.* FROM profiles p WHERE p.user_id != :__user_id AND (:want_gender = 'any' OR p.gender = :want_gender) AND (p.looking_for = 'everyone' OR p.looking_for = :my_gender_target) AND NOT EXISTS (SELECT 1 FROM swipes s WHERE s.swiper_id = :__user_id AND s.target_id = p.user_id) AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = :__user_id AND b.blocked_id = p.user_id) OR (b.blocker_id = p.user_id AND b.blocked_id = :__user_id)) ORDER BY p.updated_at DESC LIMIT :pool",
+      "params": {
+        "want_gender": {
+          "type": "string"
+        },
+        "my_gender_target": {
+          "type": "string"
+        },
+        "pool": {
+          "type": "integer",
+          "max": 500
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "record_swipe",
+      "description": "Record the caller's swipe on a target. The caller is always the swiper (server-derived).",
+      "operation": "execute",
+      "sql": "INSERT OR IGNORE INTO swipes (swiper_id, target_id, direction, created_at) VALUES (:__user_id, :target_id, :direction, :__now)",
+      "params": {
+        "target_id": {
+          "type": "string"
+        },
+        "direction": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "get_reciprocal_swipe",
+      "description": "The direction the target swiped on the caller, if any — used to decide whether a right-swipe just formed a mutual match",
+      "operation": "query",
+      "sql": "SELECT direction FROM swipes WHERE swiper_id = :target_id AND target_id = :__user_id",
+      "params": {
+        "target_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "create_match",
+      "description": "Create a match between the caller and a target — allowed ONLY when both have right-swiped each other and the caller is one of the two parties. Ids must be the ordered pair (a_id < b_id) and one of them must be the caller.",
+      "operation": "execute",
+      "sql": "INSERT OR IGNORE INTO matches (a_id, b_id, created_at) SELECT :a_id, :b_id, :__now WHERE (:a_id = :__user_id OR :b_id = :__user_id) AND EXISTS (SELECT 1 FROM swipes s1 WHERE s1.swiper_id = :a_id AND s1.target_id = :b_id AND s1.direction = 'right') AND EXISTS (SELECT 1 FROM swipes s2 WHERE s2.swiper_id = :b_id AND s2.target_id = :a_id AND s2.direction = 'right')",
+      "params": {
+        "a_id": {
+          "type": "string"
+        },
+        "b_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "load_my_matches",
+      "description": "The caller's matches (rows where the caller is either party), newest first",
+      "operation": "query",
+      "sql": "SELECT a_id, b_id, created_at FROM matches WHERE a_id = :__user_id OR b_id = :__user_id ORDER BY created_at DESC",
+      "params": {},
+      "requires_auth": true
+    },
+    {
+      "name": "load_messages",
+      "description": "Messages in one match conversation, oldest first — only readable when the caller is a participant of that match",
+      "operation": "query",
+      "sql": "SELECT * FROM messages WHERE match_a = :a_id AND match_b = :b_id AND (:__user_id = :a_id OR :__user_id = :b_id) ORDER BY created_at ASC LIMIT 500",
+      "params": {
+        "a_id": {
+          "type": "string"
+        },
+        "b_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "load_last_message",
+      "description": "The most recent message in one match conversation — only when the caller is a participant of that match",
+      "operation": "query",
+      "sql": "SELECT * FROM messages WHERE match_a = :a_id AND match_b = :b_id AND (:__user_id = :a_id OR :__user_id = :b_id) ORDER BY created_at DESC LIMIT 1",
+      "params": {
+        "a_id": {
+          "type": "string"
+        },
+        "b_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "send_message",
+      "description": "Send a message in a match. The sender is always the caller (server-derived), who must be a participant of the match AND the match must still exist (blocking/unmatching removes it).",
+      "operation": "execute",
+      "sql": "INSERT INTO messages (id, match_a, match_b, sender_id, body, created_at) SELECT :__uuid, :a_id, :b_id, :__user_id, :body, :__now WHERE (:__user_id = :a_id OR :__user_id = :b_id) AND EXISTS (SELECT 1 FROM matches m WHERE m.a_id = :a_id AND m.b_id = :b_id)",
+      "params": {
+        "a_id": {
+          "type": "string"
+        },
+        "b_id": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "count_admirers",
+      "description": "How many people right-swiped the caller and haven't been swiped back yet (excluding blocks in either direction)",
+      "operation": "query",
+      "sql": "SELECT COUNT(*) AS n FROM swipes s WHERE s.target_id = :__user_id AND s.direction = 'right' AND NOT EXISTS (SELECT 1 FROM swipes me WHERE me.swiper_id = :__user_id AND me.target_id = s.swiper_id) AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = :__user_id AND b.blocked_id = s.swiper_id) OR (b.blocker_id = s.swiper_id AND b.blocked_id = :__user_id))",
+      "params": {},
+      "requires_auth": true
+    },
+    {
+      "name": "load_admirers",
+      "description": "Profiles of people who right-swiped the caller and haven't been swiped back yet (excluding blocks in either direction), newest first",
+      "operation": "query",
+      "sql": "SELECT p.* FROM swipes s JOIN profiles p ON p.user_id = s.swiper_id WHERE s.target_id = :__user_id AND s.direction = 'right' AND NOT EXISTS (SELECT 1 FROM swipes me WHERE me.swiper_id = :__user_id AND me.target_id = s.swiper_id) AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = :__user_id AND b.blocked_id = s.swiper_id) OR (b.blocker_id = s.swiper_id AND b.blocked_id = :__user_id)) ORDER BY s.created_at DESC LIMIT :limit",
+      "params": {
+        "limit": {
+          "type": "integer",
+          "max": 200
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "unmatch",
+      "description": "End a match the caller is part of and delete its conversation, atomically. The caller must be one of the two parties.",
+      "operation": "batch",
+      "statements": [
+        "DELETE FROM messages WHERE match_a = :a_id AND match_b = :b_id AND (:__user_id = :a_id OR :__user_id = :b_id)",
+        "DELETE FROM matches WHERE a_id = :a_id AND b_id = :b_id AND (:__user_id = :a_id OR :__user_id = :b_id)"
+      ],
+      "params": {
+        "a_id": {
+          "type": "string"
+        },
+        "b_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "block_user",
+      "description": "Block another user: record the block (caller is the blocker), suppress them from discovery via a left-swipe, and tear down any existing match + conversation. Atomic.",
+      "operation": "batch",
+      "statements": [
+        "INSERT OR IGNORE INTO blocks (blocker_id, blocked_id, created_at) VALUES (:__user_id, :blocked_id, :__now)",
+        "INSERT OR REPLACE INTO swipes (swiper_id, target_id, direction, created_at) VALUES (:__user_id, :blocked_id, 'left', :__now)",
+        "DELETE FROM messages WHERE match_a = :a_id AND match_b = :b_id AND (:__user_id = :a_id OR :__user_id = :b_id)",
+        "DELETE FROM matches WHERE a_id = :a_id AND b_id = :b_id AND (:__user_id = :a_id OR :__user_id = :b_id)"
+      ],
+      "params": {
+        "blocked_id": {
+          "type": "string"
+        },
+        "a_id": {
+          "type": "string"
+        },
+        "b_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "unblock_user",
+      "description": "Remove a block the caller previously created (caller is the blocker)",
+      "operation": "execute",
+      "sql": "DELETE FROM blocks WHERE blocker_id = :__user_id AND blocked_id = :blocked_id",
+      "params": {
+        "blocked_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "is_blocked",
+      "description": "Whether a block exists between the caller and another user in either direction",
+      "operation": "query",
+      "sql": "SELECT COUNT(*) AS n FROM blocks WHERE (blocker_id = :__user_id AND blocked_id = :other_id) OR (blocker_id = :other_id AND blocked_id = :__user_id)",
+      "params": {
+        "other_id": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "report_user",
+      "description": "File an abuse report against another user. The reporter is always the caller (server-derived).",
+      "operation": "execute",
+      "sql": "INSERT INTO reports (id, reporter_id, reported_id, reason, note, created_at) VALUES (:__uuid, :__user_id, :reported_id, :reason, :note, :__now)",
+      "params": {
+        "reported_id": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        }
+      },
+      "requires_auth": true
+    },
+    {
+      "name": "seed_demo_profile",
+      "description": "Dev-only: upsert one placeholder demo profile. Guarded so it can only write ids prefixed 'demo-' — it can never impersonate a real platform user id.",
+      "operation": "execute",
+      "sql": "INSERT INTO profiles (user_id, display_name, dob, bio, gender, looking_for, photos_json, lat, lng, updated_at) SELECT :user_id, :display_name, :dob, :bio, :gender, :looking_for, :photos_json, :lat, :lng, :updated_at WHERE :user_id LIKE 'demo-%' ON CONFLICT(user_id) DO UPDATE SET display_name = excluded.display_name, dob = excluded.dob, bio = excluded.bio, gender = excluded.gender, looking_for = excluded.looking_for, photos_json = excluded.photos_json, lat = excluded.lat, lng = excluded.lng, updated_at = excluded.updated_at",
+      "params": {
+        "user_id": {
+          "type": "string"
+        },
+        "display_name": {
+          "type": "string"
+        },
+        "dob": {
+          "type": "string"
+        },
+        "bio": {
+          "type": "string"
+        },
+        "gender": {
+          "type": "string"
+        },
+        "looking_for": {
+          "type": "string"
+        },
+        "photos_json": {
+          "type": "string"
+        },
+        "lat": {
+          "type": "number",
+          "optional": true
+        },
+        "lng": {
+          "type": "number",
+          "optional": true
+        },
+        "updated_at": {
+          "type": "integer"
+        }
+      },
+      "requires_auth": true
+    }
+  ]
+}

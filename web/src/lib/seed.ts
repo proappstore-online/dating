@@ -1,5 +1,6 @@
 import type { Profile } from '../types'
-import { saveProfile } from './db'
+import { ensureMigrated } from './db'
+import { x } from './actions'
 
 interface Seed {
   name: string
@@ -62,12 +63,14 @@ function jitter(base: number | null, magnitude: number): number | null {
  * deterministic user_ids so it upserts rather than duplicating.
  */
 export async function seedDemoProfiles(anchorLat: number | null, anchorLng: number | null): Promise<number> {
+  await ensureMigrated()
   const now = Date.now()
   let inserted = 0
   for (const s of SEEDS) {
-    const userId = `demo-${s.name.toLowerCase()}`
+    // `demo-` prefix is enforced by the seed_demo_profile action guard so this
+    // dev tool can never impersonate a real platform user id.
     const profile: Profile = {
-      userId,
+      userId: `demo-${s.name.toLowerCase()}`,
       displayName: s.name,
       dob: dobForAge(s.age),
       bio: s.bio,
@@ -78,7 +81,18 @@ export async function seedDemoProfiles(anchorLat: number | null, anchorLng: numb
       lng: jitter(anchorLng, 0.4),
       updatedAt: now,
     }
-    await saveProfile(profile)
+    await x('seed_demo_profile', {
+      user_id: profile.userId,
+      display_name: profile.displayName,
+      dob: profile.dob,
+      bio: profile.bio,
+      gender: profile.gender,
+      looking_for: profile.lookingFor,
+      photos_json: JSON.stringify(profile.photos),
+      lat: profile.lat,
+      lng: profile.lng,
+      updated_at: profile.updatedAt,
+    })
     inserted++
   }
   return inserted

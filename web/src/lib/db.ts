@@ -3,6 +3,7 @@ import type { Candidate, Profile, Gender, LookingFor, Match, Message, SwipeDirec
 import { kmBetween } from './geo'
 import { ageFromDob } from './photos'
 import type { Preferences } from './prefs'
+import { q, x } from './actions'
 
 const MIGRATIONS = [
   {
@@ -76,9 +77,22 @@ const MIGRATIONS = [
 ]
 
 let migrated = false
+/**
+ * Apply pending migrations. Raw `db.migrate` runs caller-supplied SQL, so the
+ * data worker restricts it to the app's team since the cross-tenant lockdown —
+ * a regular signed-in user gets a 403 here. That's fine: the schema is already
+ * migrated (a team member's visit applies anything new), so swallow the 403 and
+ * carry on. Every user-facing read/write goes through registered actions (see
+ * lib/actions.ts + mcp.json), not raw SQL.
+ */
 export async function ensureMigrated(): Promise<void> {
   if (migrated) return
-  await app.db.migrate(MIGRATIONS)
+  try {
+    await app.db.migrate(MIGRATIONS)
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    if (!message.includes('403')) throw err
+  }
   migrated = true
 }
 
@@ -110,29 +124,30 @@ function rowToProfile(r: ProfileRow): Profile {
   }
 }
 
+/**
+ * Fetch one profile's public card by id. Used both for the caller's own profile
+ * and for the profiles of matches/admirers — profile cards are public data
+ * within the app (the same fields shown on the swipe stack).
+ */
 export async function getMyProfile(userId: string): Promise<Profile | null> {
   await ensureMigrated()
-  const { rows } = await app.db.query<ProfileRow>('SELECT * FROM profiles WHERE user_id = ?', [userId])
+  const rows = await q<ProfileRow>('get_profile', { user_id: userId })
   return rows[0] ? rowToProfile(rows[0]) : null
 }
 
 export async function saveProfile(p: Profile): Promise<void> {
   await ensureMigrated()
-  await app.db.execute(
-    `INSERT INTO profiles (user_id, display_name, dob, bio, gender, looking_for, photos_json, lat, lng, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(user_id) DO UPDATE SET
-       display_name = excluded.display_name,
-       dob          = excluded.dob,
-       bio          = excluded.bio,
-       gender       = excluded.gender,
-       looking_for  = excluded.looking_for,
-       photos_json  = excluded.photos_json,
-       lat          = excluded.lat,
-       lng          = excluded.lng,
-       updated_at   = excluded.updated_at`,
-    [p.userId, p.displayName, p.dob, p.bio, p.gender, p.lookingFor, JSON.stringify(p.photos), p.lat, p.lng, p.updatedAt],
-  )
+  await x('save_my_profile', {
+    display_name: p.displayName,
+    dob: p.dob,
+    bio: p.bio,
+    gender: p.gender,
+    looking_for: p.lookingFor,
+    photos_json: JSON.stringify(p.photos),
+    lat: p.lat,
+    lng: p.lng,
+    updated_at: p.updatedAt,
+  })
 }
 
 /**
@@ -147,21 +162,15 @@ export async function loadCandidates(
   limit = 25,
 ): Promise<Candidate[]> {
   await ensureMigrated()
-  const wants = wantsGenderSql(me.lookingFor)
-  const wantsMe = `(p.looking_for = 'everyone' OR p.looking_for = ?)`
+  const wantGender =
+    me.lookingFor === 'women' ? 'woman' : me.lookingFor === 'men' ? 'man' : 'any'
   const myGenderTarget = me.gender === 'woman' ? 'women' : me.gender === 'man' ? 'men' : 'everyone'
   const pool = Math.max(limit * 4, 100)
-  const { rows } = await app.db.query<ProfileRow>(
-    `SELECT p.* FROM profiles p
-     WHERE p.user_id != ?
-       AND ${wants}
-       AND ${wantsMe}
-       AND NOT EXISTS (SELECT 1 FROM swipes s WHERE s.swiper_id = ? AND s.target_id = p.user_id)
-       AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = ? AND b.blocked_id = p.user_id) OR (b.blocker_id = p.user_id AND b.blocked_id = ?))
-     ORDER BY p.updated_at DESC
-     LIMIT ?`,
-    [me.userId, myGenderTarget, me.userId, me.userId, me.userId, pool],
-  )
+  const rows = await q<ProfileRow>('load_candidates', {
+    want_gender: wantGender,
+    my_gender_target: myGenderTarget,
+    pool,
+  })
 
   const out: Candidate[] = []
   for (const r of rows) {
@@ -186,19 +195,14 @@ export async function loadCandidates(
   return out.slice(0, limit)
 }
 
-function wantsGenderSql(lookingFor: LookingFor): string {
-  if (lookingFor === 'women') return `p.gender = 'woman'`
-  if (lookingFor === 'men') return `p.gender = 'man'`
-  return `1=1`
-}
-
 export function orderedPair(a: string, b: string): [string, string] {
   return a < b ? [a, b] : [b, a]
 }
 
 /**
  * Record a swipe. If reciprocal right-swipe exists, create a match. Returns the new
- * match if one was just created, otherwise null.
+ * match if one was just created, otherwise null. The swipe actor and match
+ * membership are enforced server-side against the verified caller.
  */
 export async function recordSwipe(
   swiperId: string,
@@ -206,25 +210,16 @@ export async function recordSwipe(
   direction: SwipeDirection,
 ): Promise<Match | null> {
   await ensureMigrated()
-  const now = Date.now()
-  await app.db.execute(
-    `INSERT OR IGNORE INTO swipes (swiper_id, target_id, direction, created_at) VALUES (?, ?, ?, ?)`,
-    [swiperId, targetId, direction, now],
-  )
+  await x('record_swipe', { target_id: targetId, direction })
   if (direction !== 'right') return null
 
-  const { rows } = await app.db.query<{ direction: string }>(
-    `SELECT direction FROM swipes WHERE swiper_id = ? AND target_id = ?`,
-    [targetId, swiperId],
-  )
+  const rows = await q<{ direction: string }>('get_reciprocal_swipe', { target_id: targetId })
   if (!rows[0] || rows[0].direction !== 'right') return null
 
   const [aId, bId] = orderedPair(swiperId, targetId)
-  await app.db.execute(
-    `INSERT OR IGNORE INTO matches (a_id, b_id, created_at) VALUES (?, ?, ?)`,
-    [aId, bId, now],
-  )
-  return { aId, bId, createdAt: now }
+  const meta = await x('create_match', { a_id: aId, b_id: bId })
+  if (meta.changes < 1) return null
+  return { aId, bId, createdAt: Date.now() }
 }
 
 export interface MatchWithProfile {
@@ -235,14 +230,11 @@ export interface MatchWithProfile {
 
 export async function loadMatches(userId: string): Promise<MatchWithProfile[]> {
   await ensureMigrated()
-  const { rows } = await app.db.query<{
+  const rows = await q<{
     a_id: string
     b_id: string
     created_at: number
-  }>(
-    `SELECT a_id, b_id, created_at FROM matches WHERE a_id = ? OR b_id = ? ORDER BY created_at DESC`,
-    [userId, userId],
-  )
+  }>('load_my_matches')
   const result: MatchWithProfile[] = []
   for (const m of rows) {
     const otherId = m.a_id === userId ? m.b_id : m.a_id
@@ -280,18 +272,12 @@ function rowToMessage(r: MessageRow): Message {
 
 export async function loadMessages(aId: string, bId: string): Promise<Message[]> {
   await ensureMigrated()
-  const { rows } = await app.db.query<MessageRow>(
-    `SELECT * FROM messages WHERE match_a = ? AND match_b = ? ORDER BY created_at ASC LIMIT 500`,
-    [aId, bId],
-  )
+  const rows = await q<MessageRow>('load_messages', { a_id: aId, b_id: bId })
   return rows.map(rowToMessage)
 }
 
 async function loadLastMessage(aId: string, bId: string): Promise<Message | null> {
-  const { rows } = await app.db.query<MessageRow>(
-    `SELECT * FROM messages WHERE match_a = ? AND match_b = ? ORDER BY created_at DESC LIMIT 1`,
-    [aId, bId],
-  )
+  const rows = await q<MessageRow>('load_last_message', { a_id: aId, b_id: bId })
   return rows[0] ? rowToMessage(rows[0]) : null
 }
 
@@ -302,7 +288,10 @@ export async function sendMessage(
   body: string,
 ): Promise<Message> {
   await ensureMigrated()
-  const msg: Message = {
+  await x('send_message', { a_id: aId, b_id: bId, body })
+  // The server assigns the row id + timestamp; mirror the sender's optimistic
+  // copy locally so the UI and the realtime broadcast stay consistent.
+  return {
     id: crypto.randomUUID(),
     matchA: aId,
     matchB: bId,
@@ -310,11 +299,6 @@ export async function sendMessage(
     body,
     createdAt: Date.now(),
   }
-  await app.db.execute(
-    `INSERT INTO messages (id, match_a, match_b, sender_id, body, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
-    [msg.id, msg.matchA, msg.matchB, msg.senderId, msg.body, msg.createdAt],
-  )
-  return msg
 }
 
 /**
@@ -322,15 +306,9 @@ export async function sendMessage(
  * users I've blocked or who have blocked me). Each one is a guaranteed match
  * waiting on my swipe.
  */
-export async function countAdmirers(userId: string): Promise<number> {
+export async function countAdmirers(_userId: string): Promise<number> {
   await ensureMigrated()
-  const { rows } = await app.db.query<{ n: number }>(
-    `SELECT COUNT(*) AS n FROM swipes s
-     WHERE s.target_id = ? AND s.direction = 'right'
-       AND NOT EXISTS (SELECT 1 FROM swipes me WHERE me.swiper_id = ? AND me.target_id = s.swiper_id)
-       AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = ? AND b.blocked_id = s.swiper_id) OR (b.blocker_id = s.swiper_id AND b.blocked_id = ?))`,
-    [userId, userId, userId, userId],
-  )
+  const rows = await q<{ n: number }>('count_admirers')
   return rows[0]?.n ?? 0
 }
 
@@ -339,27 +317,15 @@ export async function countAdmirers(userId: string): Promise<number> {
  * populate the "X likes you" preview list — these are guaranteed matches the
  * moment the user swipes right.
  */
-export async function loadAdmirers(userId: string, limit = 50): Promise<Profile[]> {
+export async function loadAdmirers(_userId: string, limit = 50): Promise<Profile[]> {
   await ensureMigrated()
-  const { rows } = await app.db.query<ProfileRow>(
-    `SELECT p.* FROM swipes s
-       JOIN profiles p ON p.user_id = s.swiper_id
-     WHERE s.target_id = ? AND s.direction = 'right'
-       AND NOT EXISTS (SELECT 1 FROM swipes me WHERE me.swiper_id = ? AND me.target_id = s.swiper_id)
-       AND NOT EXISTS (SELECT 1 FROM blocks b WHERE (b.blocker_id = ? AND b.blocked_id = s.swiper_id) OR (b.blocker_id = s.swiper_id AND b.blocked_id = ?))
-     ORDER BY s.created_at DESC
-     LIMIT ?`,
-    [userId, userId, userId, userId, limit],
-  )
+  const rows = await q<ProfileRow>('load_admirers', { limit })
   return rows.map(rowToProfile)
 }
 
 export async function unmatch(aId: string, bId: string): Promise<void> {
   await ensureMigrated()
-  await app.db.batch([
-    { sql: `DELETE FROM messages WHERE match_a = ? AND match_b = ?`, params: [aId, bId] },
-    { sql: `DELETE FROM matches WHERE a_id = ? AND b_id = ?`, params: [aId, bId] },
-  ])
+  await x('unmatch', { a_id: aId, b_id: bId })
 }
 
 /**
@@ -370,43 +336,33 @@ export async function unmatch(aId: string, bId: string): Promise<void> {
 export async function blockUser(blockerId: string, blockedId: string): Promise<void> {
   await ensureMigrated()
   const [aId, bId] = orderedPair(blockerId, blockedId)
-  const now = Date.now()
-  await app.db.batch([
-    { sql: `INSERT OR IGNORE INTO blocks (blocker_id, blocked_id, created_at) VALUES (?, ?, ?)`, params: [blockerId, blockedId, now] },
-    { sql: `INSERT OR REPLACE INTO swipes (swiper_id, target_id, direction, created_at) VALUES (?, ?, 'left', ?)`, params: [blockerId, blockedId, now] },
-    { sql: `DELETE FROM messages WHERE match_a = ? AND match_b = ?`, params: [aId, bId] },
-    { sql: `DELETE FROM matches WHERE a_id = ? AND b_id = ?`, params: [aId, bId] },
-  ])
+  await x('block_user', { blocked_id: blockedId, a_id: aId, b_id: bId })
 }
 
-export async function unblock(blockerId: string, blockedId: string): Promise<void> {
+export async function unblock(blockedId: string): Promise<void> {
   await ensureMigrated()
-  await app.db.execute(
-    `DELETE FROM blocks WHERE blocker_id = ? AND blocked_id = ?`,
-    [blockerId, blockedId],
-  )
+  await x('unblock_user', { blocked_id: blockedId })
 }
 
-export async function isBlocked(aId: string, bId: string): Promise<boolean> {
+/**
+ * Whether the caller is blocked with `otherId` in either direction. The block
+ * check is always relative to the verified caller — server-derived — so the
+ * other party in the pair is the one argument that matters.
+ */
+export async function isBlocked(otherId: string): Promise<boolean> {
   await ensureMigrated()
-  const { rows } = await app.db.query<{ n: number }>(
-    `SELECT COUNT(*) AS n FROM blocks WHERE (blocker_id = ? AND blocked_id = ?) OR (blocker_id = ? AND blocked_id = ?)`,
-    [aId, bId, bId, aId],
-  )
+  const rows = await q<{ n: number }>('is_blocked', { other_id: otherId })
   return (rows[0]?.n ?? 0) > 0
 }
 
 export type ReportReason = 'inappropriate' | 'spam' | 'underage' | 'harassment' | 'fake' | 'other'
 
 export async function reportUser(
-  reporterId: string,
+  _reporterId: string,
   reportedId: string,
   reason: ReportReason,
   note: string,
 ): Promise<void> {
   await ensureMigrated()
-  await app.db.execute(
-    `INSERT INTO reports (id, reporter_id, reported_id, reason, note, created_at) VALUES (?, ?, ?, ?, ?, ?)`,
-    [crypto.randomUUID(), reporterId, reportedId, reason, note, Date.now()],
-  )
+  await x('report_user', { reported_id: reportedId, reason, note })
 }
