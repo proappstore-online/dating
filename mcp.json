@@ -2,9 +2,9 @@
   "tools": [
     {
       "name": "get_profile",
-      "description": "Public profile card (name, photos, bio, gender, distance basis) for one user by id — the same data shown on swipe cards and match previews",
+      "description": "Profile card for the caller or for one of the caller's matches (the same data shown on swipe cards and match previews). Returns nothing for users the caller has not matched with.",
       "operation": "query",
-      "sql": "SELECT * FROM profiles WHERE user_id = :user_id",
+      "sql": "SELECT * FROM profiles p WHERE p.user_id = :user_id AND (p.user_id = :__user_id OR EXISTS (SELECT 1 FROM matches m WHERE (m.a_id = :__user_id AND m.b_id = p.user_id) OR (m.b_id = :__user_id AND m.a_id = p.user_id)))",
       "params": {
         "user_id": {
           "type": "string"
@@ -310,7 +310,12 @@
           "type": "integer"
         }
       },
-      "requires_auth": true
+      "requires_auth": true,
+      "auth": {
+        "caller_unscoped": {
+          "reason": "dev seeding of placeholder profiles: the WHERE guard only lets it write rows whose user_id starts with demo-, so it can never create or modify a real user profile"
+        }
+      }
     }
   ]
 }

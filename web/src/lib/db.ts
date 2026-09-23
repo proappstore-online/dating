@@ -125,9 +125,9 @@ function rowToProfile(r: ProfileRow): Profile {
 }
 
 /**
- * Fetch one profile's public card by id. Used both for the caller's own profile
- * and for the profiles of matches/admirers — profile cards are public data
- * within the app (the same fields shown on the swipe stack).
+ * Fetch one profile card by id. Used both for the caller's own profile and for
+ * the profiles of matches; the get_profile action returns nothing for anyone
+ * the caller has not matched with.
  */
 export async function getMyProfile(userId: string): Promise<Profile | null> {
   await ensureMigrated()
