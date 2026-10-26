@@ -314,7 +314,10 @@
       "auth": {
         "app_roles": [
           "owner"
-        ]
+        ],
+        "caller_unscoped": {
+          "reason": "Owner-only demo seeding writes shared placeholder profiles. The SQL guard restricts target ids to demo-; app_roles restricts callers to the app owner."
+        }
       }
     }
   ],
