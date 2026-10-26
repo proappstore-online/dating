@@ -132,6 +132,7 @@ export default function Chat({ me, aId, bId, otherName, onNavigate }: Props) {
         style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
       >
         <textarea
+          aria-label="Message"
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {

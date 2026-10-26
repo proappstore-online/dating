@@ -312,10 +312,20 @@
       },
       "requires_auth": true,
       "auth": {
-        "caller_unscoped": {
-          "reason": "dev seeding of placeholder profiles: the WHERE guard only lets it write rows whose user_id starts with demo-, so it can never create or modify a real user profile"
-        }
+        "app_roles": [
+          "owner"
+        ]
       }
+    }
+  ],
+  "permissions": [
+    {
+      "id": "location",
+      "reason": "Find and rank nearby profiles within your preferred distance."
+    },
+    {
+      "id": "notifications",
+      "reason": "Notify you about new matches and messages when you opt in."
     }
   ]
 }

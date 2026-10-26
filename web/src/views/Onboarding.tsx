@@ -159,6 +159,7 @@ export default function Onboarding({ userId, dob, initial, onDone }: Props) {
           ))}
           {photos.length < 6 && (
             <button
+              aria-label="Add photo"
               onClick={() => fileRef.current?.click()}
               disabled={uploading}
               className="aspect-square rounded-xl border-2 border-dashed border-[var(--line)] flex items-center justify-center text-3xl text-[var(--muted)] disabled:opacity-50"
@@ -169,6 +170,7 @@ export default function Onboarding({ userId, dob, initial, onDone }: Props) {
         </div>
         <input
           ref={fileRef}
+          aria-label="Profile photo"
           type="file"
           accept="image/*"
           multiple
@@ -180,6 +182,7 @@ export default function Onboarding({ userId, dob, initial, onDone }: Props) {
 
       <Section label="Display name">
         <input
+          aria-label="Display name"
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
           maxLength={40}
@@ -197,6 +200,7 @@ export default function Onboarding({ userId, dob, initial, onDone }: Props) {
 
       <Section label="About you">
         <textarea
+          aria-label="About you"
           value={bio}
           onChange={(e) => setBio(e.target.value)}
           maxLength={300}
@@ -239,6 +243,7 @@ export default function Onboarding({ userId, dob, initial, onDone }: Props) {
       )}
 
       <button
+        aria-label={initial ? 'Save profile' : 'Start dating'}
         onClick={handleSave}
         disabled={!canSave || saving}
         className="w-full rounded-full bg-[var(--accent)] text-white font-semibold py-3.5 mt-4 disabled:opacity-40 active:scale-[0.98] transition"
@@ -272,6 +277,7 @@ function Pills<T extends string>({
       {options.map((o) => (
         <button
           key={o.value}
+          aria-label={o.label}
           onClick={() => onChange(o.value)}
           className={`px-4 py-2 rounded-full border text-sm font-medium transition ${
             value === o.value

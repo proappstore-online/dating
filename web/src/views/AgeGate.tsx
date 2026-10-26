@@ -42,6 +42,7 @@ export default function AgeGate({ onSet }: Props) {
       </p>
 
       <input
+        aria-label="Date of birth"
         type="date"
         value={dob}
         onChange={(e) => setDob(e.target.value)}
@@ -60,6 +61,7 @@ export default function AgeGate({ onSet }: Props) {
       {error && <p className="text-[var(--error)] text-sm mt-3">{error}</p>}
 
       <button
+        aria-label="Confirm date of birth"
         onClick={handleConfirm}
         disabled={!ready || saving}
         className="mt-8 rounded-full bg-[var(--accent)] text-white font-semibold px-8 py-3 disabled:opacity-40 active:scale-95 transition"

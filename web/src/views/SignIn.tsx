@@ -59,6 +59,7 @@ export default function SignIn() {
           className="w-full max-w-xs flex flex-col gap-3"
         >
           <input
+            aria-label="Email address"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -71,6 +72,7 @@ export default function SignIn() {
           />
           {error && <p className="text-[var(--error)] text-sm">{error}</p>}
           <button
+            aria-label="Email me a link"
             type="submit"
             disabled={sending || !email.trim()}
             className="rounded-full bg-[var(--ink)] text-[var(--paper)] font-semibold px-8 py-3 disabled:opacity-40 active:scale-95 transition"

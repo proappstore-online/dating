@@ -1,15 +1,26 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [
+    {
+      name: 'release-marker',
+      generateBundle() {
+        this.emitFile({
+          type: 'asset',
+          fileName: 'version.json',
+          source: JSON.stringify({ commit: loadEnv(mode, '.', 'VITE_').VITE_COMMIT_SHA || 'development' }),
+        });
+      },
+    },
     react(),
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
       workbox: {
+        navigateFallbackDenylist: [/^\/\.pas\//],
         globPatterns: ['**/*.{js,css,html,png,svg,ico,woff2,wasm,json}'],
         maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
         runtimeCaching: [
@@ -33,6 +44,7 @@ export default defineConfig({
         background_color: "#fffaf7",
         theme_color: "#e11d48",
         orientation: "portrait",
+        ...{ min_viewport_width: 360 },
         categories: ['social', 'lifestyle'],
         icons: [
           { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
@@ -43,4 +55,4 @@ export default defineConfig({
     }),
   ],
   server: { host: true },
-});
+}));

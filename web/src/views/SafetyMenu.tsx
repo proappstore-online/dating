@@ -95,6 +95,7 @@ export default function SafetyMenu({ meId, otherId, aId, bId, otherName, onClose
               {(['inappropriate', 'spam', 'underage', 'harassment', 'fake', 'other'] as ReportReason[]).map((r) => (
                 <button
                   key={r}
+                  aria-label={reasonLabel(r)}
                   onClick={() => setReason(r)}
                   className={`px-3 py-1.5 rounded-full text-sm border ${
                     reason === r
@@ -107,6 +108,7 @@ export default function SafetyMenu({ meId, otherId, aId, bId, otherName, onClose
               ))}
             </div>
             <textarea
+              aria-label="Report context"
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Optional context"
@@ -118,6 +120,7 @@ export default function SafetyMenu({ meId, otherId, aId, bId, otherName, onClose
             <div className="flex gap-2">
               <button onClick={() => setStep('menu')} className="flex-1 py-3 rounded-full border border-[var(--line)]">Back</button>
               <button
+                aria-label="Send report"
                 onClick={runReport}
                 disabled={busy}
                 className="flex-1 py-3 rounded-full bg-[var(--error)] text-white font-semibold disabled:opacity-50"
@@ -137,6 +140,7 @@ function MenuRow({
 }: { label: string; desc: string; onClick: () => void; danger?: boolean }) {
   return (
     <button
+      aria-label={label}
       onClick={onClick}
       className={`w-full text-left p-3 rounded-2xl active:bg-[var(--accent-soft)] transition flex flex-col`}
     >
@@ -161,6 +165,7 @@ function Confirm({
       <div className="flex gap-2">
         <button onClick={onCancel} className="flex-1 py-3 rounded-full border border-[var(--line)]">Cancel</button>
         <button
+          aria-label={cta}
           onClick={onConfirm}
           disabled={busy}
           className={`flex-1 py-3 rounded-full text-white font-semibold disabled:opacity-50 ${

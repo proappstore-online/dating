@@ -291,6 +291,7 @@ function ActionButton({
   const color = variant === 'yes' ? 'text-[var(--accent)]' : 'text-[var(--ink)]'
   return (
     <button
+      aria-label={variant === 'yes' ? 'Like profile' : 'Pass profile'}
       onClick={onClick}
       className={`w-16 h-16 rounded-full bg-white shadow-lg flex items-center justify-center text-3xl active:scale-90 transition ${color}`}
     >

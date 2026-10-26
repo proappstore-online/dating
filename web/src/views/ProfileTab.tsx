@@ -232,6 +232,7 @@ function Slider({
         <span className="font-semibold">{format(value)}</span>
       </div>
       <input
+        aria-label={label}
         type="range"
         min={min}
         max={max}
