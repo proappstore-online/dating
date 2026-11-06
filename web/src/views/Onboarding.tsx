@@ -116,7 +116,7 @@ export default function Onboarding({ userId, dob, initial, onDone }: Props) {
   }
 
   return (
-    <div className="min-h-dvh px-5 py-8 max-w-md mx-auto">
+    <div className="min-h-full px-5 py-8 max-w-md mx-auto">
       <h1 className="display-font text-3xl mb-1">Your profile</h1>
       <p className="text-[var(--muted)] mb-6 text-sm">A few details so people can find you.</p>
 

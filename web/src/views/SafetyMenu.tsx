@@ -45,7 +45,7 @@ export default function SafetyMenu({ meId, otherId, aId, bId, otherName, onClose
   return (
     <div className="fixed inset-0 z-40 bg-black/40 flex items-end" onClick={onClose}>
       <div
-        className="w-full bg-[var(--paper)] rounded-t-3xl p-5 pb-8"
+        className="max-h-full overflow-y-auto w-full bg-[var(--paper)] rounded-t-3xl p-5 pb-8"
         style={{ paddingBottom: 'max(2rem, env(safe-area-inset-bottom))' }}
         onClick={(e) => e.stopPropagation()}
       >

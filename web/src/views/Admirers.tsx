@@ -26,7 +26,7 @@ export default function Admirers({ me, onNavigate }: Props) {
   }, [me.userId])
 
   return (
-    <div className="min-h-dvh">
+    <div className="min-h-full">
       <header className="flex items-center gap-3 px-4 py-3 border-b border-[var(--line)] bg-[var(--paper)]">
         <button
           onClick={() => onNavigate({ name: 'discover' })}

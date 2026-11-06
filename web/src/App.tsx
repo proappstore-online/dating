@@ -71,7 +71,7 @@ export default function App() {
 
   if (stage.name === 'booting') {
     return (
-      <div className="min-h-dvh flex flex-col items-center justify-center px-6">
+      <div className="min-h-full flex flex-col items-center justify-center px-6">
         <div className="text-6xl mb-3 animate-pulse" aria-hidden="true">&#10084;</div>
         <p className="text-sm text-[var(--muted)]">Warming up…</p>
       </div>
@@ -98,7 +98,7 @@ export default function App() {
   }
   if (stage.name === 'too-young') {
     return (
-      <div className="min-h-dvh flex flex-col items-center justify-center px-6 text-center">
+      <div className="min-h-full flex flex-col items-center justify-center px-6 text-center">
         <div className="text-5xl mb-4">&#9203;</div>
         <h1 className="display-font text-3xl mb-2">Come back later.</h1>
         <p className="text-[var(--muted)] max-w-xs mb-6">
@@ -186,8 +186,8 @@ function Ready({
   // survives a quick "check messages and come back" trip without
   // re-fetching from D1 every time.
   return (
-    <div className="flex flex-col h-dvh">
-      <main className="flex-1 overflow-y-auto">
+    <div className="flex flex-col h-full">
+      <main className="min-h-0 flex-1 overflow-y-auto">
         <div className={view.name === 'discover' ? 'h-full' : 'hidden'}>
           <Discover me={me} epoch={discoverEpoch} onMatched={() => { refreshMatches(); bumpDiscover() }} onNavigate={setView} />
         </div>
@@ -277,7 +277,7 @@ function BottomNav({
 }) {
   return (
     <nav
-      className="flex border-t border-[var(--line)] bg-[var(--paper)]"
+      className="flex shrink-0 border-t border-[var(--line)] bg-[var(--paper)]"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <Tab label="Discover" icon="&#10084;" current={active === 'discover'} onClick={() => onChange('discover')} />

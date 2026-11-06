@@ -28,7 +28,7 @@ export default function SignIn() {
   }
 
   return (
-    <div className="min-h-dvh flex flex-col items-center justify-center px-6 text-center">
+    <div className="min-h-full flex flex-col items-center justify-center px-6 text-center">
       <div className="text-7xl mb-6">&#10084;</div>
       <h1 className="display-font text-5xl mb-3">dating</h1>
       <p className="text-[var(--muted)] mb-10 max-w-xs">

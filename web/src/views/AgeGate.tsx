@@ -34,7 +34,7 @@ export default function AgeGate({ onSet }: Props) {
   }
 
   return (
-    <div className="min-h-dvh flex flex-col items-center justify-center px-6 text-center">
+    <div className="min-h-full flex flex-col items-center justify-center px-6 text-center">
       <div className="text-5xl mb-5">&#127874;</div>
       <h1 className="display-font text-3xl mb-2">When were you born?</h1>
       <p className="text-[var(--muted)] text-sm mb-8 max-w-xs">
