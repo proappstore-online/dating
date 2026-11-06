@@ -1,5 +1,5 @@
 // Published on https://proappstore.online — visit for more pro apps.
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import type { User } from '@proappstore/sdk'
 import type { Profile, View } from './types'
 import { app } from './lib/app'
@@ -119,9 +119,8 @@ export default function App() {
         userId={stage.user.id}
         dob={stage.dob}
         initial={stage.initial}
-        onDone={async () => {
-          const me = await getMyProfile(stage.user.id)
-          if (me) setStage({ name: 'ready', user: stage.user, me })
+        onDone={(me) => {
+          setStage({ name: 'ready', user: stage.user, me })
           // Tell everyone else's Discover: there's a new face in the pool.
           broadcastProfileUpdated(stage.user.id)
         }}
@@ -141,6 +140,8 @@ function Ready({
   onProfileUpdate: (next: Profile) => void
 }) {
   const [matches, setMatches] = useState<MatchWithProfile[]>([])
+  const mainRef = useRef<HTMLElement>(null)
+  useEffect(() => { mainRef.current?.scrollTo({ top: 0 }) }, [view.name])
   const refreshMatches = useCallback(async () => {
     try { setMatches(await loadMatches(me.userId)) }
     catch { /* swallow; will retry on next nav */ }
@@ -187,7 +188,7 @@ function Ready({
   // re-fetching from D1 every time.
   return (
     <div className="flex flex-col h-full">
-      <main className="min-h-0 flex-1 overflow-y-auto">
+      <main ref={mainRef} className="min-h-0 flex-1 overflow-y-auto">
         <div className={view.name === 'discover' ? 'h-full' : 'hidden'}>
           <Discover me={me} epoch={discoverEpoch} onMatched={() => { refreshMatches(); bumpDiscover() }} onNavigate={setView} />
         </div>
@@ -303,6 +304,7 @@ function Tab({
   return (
     <button
       onClick={onClick}
+      aria-current={current ? 'page' : undefined}
       className={`flex-1 py-2 flex flex-col items-center gap-0.5 text-xs relative transition-colors ${
         current ? 'text-[var(--accent)]' : 'text-[var(--muted)]'
       }`}

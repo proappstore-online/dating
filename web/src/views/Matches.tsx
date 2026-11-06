@@ -25,10 +25,19 @@ function relativeTime(ts: number): string {
 export default function Matches({ me, matches, unread, onNavigate }: Props) {
   if (matches.length === 0) {
     return (
-      <div className="p-8 text-center text-[var(--muted)]">
-        <div className="text-5xl mb-3">&#128172;</div>
-        <p className="text-lg">No matches yet.</p>
-        <p className="text-sm mt-1">Head over to Discover and start swiping.</p>
+      <div className="px-5 py-6">
+        <h1 className="display-font text-3xl">Matches</h1>
+        <div className="py-16 text-center">
+          <div aria-hidden="true" className="text-5xl mb-4">&#128172;</div>
+          <h2 className="display-font text-2xl mb-2">A hello starts here.</h2>
+          <p className="text-sm text-[var(--muted)] max-w-xs mx-auto">When you both like each other, you can chat here.</p>
+          <button
+            onClick={() => onNavigate({ name: 'discover' })}
+            className="mt-6 rounded-full bg-[var(--ink)] text-[var(--paper)] font-semibold px-6 py-3 text-sm"
+          >
+            Discover people
+          </button>
+        </div>
       </div>
     )
   }
@@ -77,24 +86,24 @@ function MatchRow({
       onClick={onOpen}
       className="w-full flex items-center gap-3 p-3 rounded-2xl active:bg-[var(--accent-soft)] transition text-left"
     >
-      <div className="relative w-14 h-14 rounded-full overflow-hidden flex-shrink-0">
+      <div className="relative w-14 h-14 flex-shrink-0">
         {photo && !imgBroken ? (
           <img
             src={photo}
             alt=""
-            className="w-full h-full object-cover"
+            className="w-full h-full rounded-full object-cover"
             onError={() => setImgBroken(true)}
           />
         ) : (
           <div
-            className="w-full h-full flex items-center justify-center text-xl font-bold text-white"
+            className="w-full h-full rounded-full flex items-center justify-center text-xl font-bold text-white"
             style={{ background: `linear-gradient(135deg, hsl(${(m.other.displayName.charCodeAt(0) || 200) * 7 % 360}, 60%, 55%), hsl(${(m.other.displayName.charCodeAt(0) || 200) * 7 % 360 + 40}, 50%, 45%))` }}
           >
             {initial}
           </div>
         )}
         {count > 0 && (
-          <span className="absolute -top-1 -right-1 bg-[var(--accent)] text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center ring-2 ring-[var(--paper)]">
+          <span aria-label={`${count} unread messages`} className="absolute -top-1 -right-1 bg-[var(--accent)] text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] px-1 flex items-center justify-center ring-2 ring-[var(--paper)]">
             {count > 9 ? '9+' : count}
           </span>
         )}

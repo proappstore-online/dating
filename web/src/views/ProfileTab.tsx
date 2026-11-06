@@ -20,6 +20,10 @@ interface Props {
 
 export default function ProfileTab({ me, onUpdated, onPrefsChanged, onNavigate }: Props) {
   const [editing, setEditing] = useState(false)
+  const profileRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!editing) profileRef.current?.scrollIntoView({ block: 'start' })
+  }, [editing])
   const [prefs, setPrefs] = useState<Preferences>(DEFAULT_PREFS)
   const [prefsLoaded, setPrefsLoaded] = useState(false)
   const [notifPerm, setNotifPerm] = useState<NotificationPermission | 'unsupported'>(getNotificationPermission())
@@ -66,9 +70,9 @@ export default function ProfileTab({ me, onUpdated, onPrefsChanged, onNavigate }
         userId={me.userId}
         dob={me.dob}
         initial={me}
-        onDone={() => {
+        onDone={(profile) => {
           setEditing(false)
-          onUpdated({ ...me, updatedAt: Date.now() })
+          onUpdated(profile)
         }}
       />
     )
@@ -76,28 +80,36 @@ export default function ProfileTab({ me, onUpdated, onPrefsChanged, onNavigate }
 
   const age = ageFromDob(me.dob)
   return (
-    <div className="px-5 py-6 max-w-md mx-auto">
-      <h1 className="display-font text-3xl mb-6">Profile</h1>
+    <div ref={profileRef} className="px-5 py-6 max-w-md mx-auto">
+      <div className="flex items-center justify-between gap-3 mb-5">
+        <h1 className="display-font text-3xl">Profile</h1>
+        <button
+          onClick={() => setEditing(true)}
+          className="rounded-full bg-[var(--ink)] text-[var(--paper)] font-semibold px-5 py-3 text-sm"
+        >
+          Edit profile
+        </button>
+      </div>
       <div className="rounded-3xl overflow-hidden bg-[var(--accent-soft)] mb-4">
         {me.photos[0] ? (
-          <img src={me.photos[0]} alt="" className="w-full aspect-square object-cover" />
+          <img src={me.photos[0]} alt="Your profile photo" className="w-full aspect-[4/3] object-cover" />
         ) : (
-          <div className="w-full aspect-square flex items-center justify-center text-6xl text-[var(--muted)]">?</div>
+          <div className="w-full aspect-[4/3] flex items-center justify-center text-6xl text-[var(--muted)]">{me.displayName.trim().charAt(0).toUpperCase() || '?'}</div>
         )}
       </div>
 
       <div className="mb-2 flex items-baseline gap-2">
-        <h2 className="text-2xl font-bold display-font">{me.displayName}</h2>
+        <h2 className="min-w-0 break-words text-2xl font-bold display-font">{me.displayName}</h2>
         {age != null && <span className="text-xl text-[var(--muted)]">{age}</span>}
       </div>
-      {me.bio && <p className="text-[var(--ink)] mb-6 whitespace-pre-line">{me.bio}</p>}
+      {me.bio && <p className="text-[var(--ink)] mb-6 whitespace-pre-line break-words">{me.bio}</p>}
 
       <Row label="I am" value={genderLabel(me.gender)} />
       <Row label="Looking for" value={lookingForLabel(me.lookingFor)} />
       <Row label="Photos" value={`${me.photos.length} uploaded`} />
 
       <h3 className="display-font text-xl mt-8 mb-2">Notifications</h3>
-      <div className="rounded-2xl border border-[var(--line)] p-4 bg-white">
+      <div className="rounded-2xl border border-[var(--line)] p-4 bg-[var(--paper)]">
         <div className="flex items-center justify-between gap-3">
           <div className="text-sm">
             {notifPerm === 'granted' && 'On — pings while Dating is open in any tab.'}
@@ -126,7 +138,7 @@ export default function ProfileTab({ me, onUpdated, onPrefsChanged, onNavigate }
             <p className="text-xs text-[var(--muted)] flex-1">
               {canInstall
                 ? 'Install Dating to your home screen for the full app experience.'
-                : 'Add to home screen via your browser&rsquo;s share menu for the full app experience.'}
+                : 'Add to home screen via your browser’s share menu for the full app experience.'}
             </p>
             {canInstall && (
               <button
@@ -141,7 +153,7 @@ export default function ProfileTab({ me, onUpdated, onPrefsChanged, onNavigate }
       </div>
 
       <h3 className="display-font text-xl mt-8 mb-2">Discovery</h3>
-      <div className="rounded-2xl border border-[var(--line)] p-4 bg-white">
+      <div className="rounded-2xl border border-[var(--line)] p-4 bg-[var(--paper)]">
         <Slider
           label="Maximum distance"
           value={prefs.maxDistanceKm}
@@ -175,12 +187,6 @@ export default function ProfileTab({ me, onUpdated, onPrefsChanged, onNavigate }
         />
       </div>
 
-      <button
-        onClick={() => setEditing(true)}
-        className="w-full rounded-full bg-[var(--ink)] text-[var(--paper)] font-semibold py-3.5 mt-6"
-      >
-        Edit profile
-      </button>
       <button
         onClick={() => { app.auth.signOut(); onNavigate({ name: 'signin' }) }}
         className="w-full rounded-full border border-[var(--line)] py-3.5 mt-3"

@@ -68,7 +68,7 @@ export default function SignIn() {
             autoCapitalize="off"
             autoCorrect="off"
             spellCheck={false}
-            className="rounded-full border border-[var(--line)] bg-white px-5 py-3 text-base text-center"
+            className="rounded-full border border-[var(--line)] bg-[var(--paper)] px-5 py-3 text-base text-center"
           />
           {error && <p className="text-[var(--error)] text-sm">{error}</p>}
           <button

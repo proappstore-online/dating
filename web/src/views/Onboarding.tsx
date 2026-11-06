@@ -8,7 +8,7 @@ interface Props {
   /** Platform-level date of birth — set by AgeGate before this view ever renders. */
   dob: string
   initial: Profile | null
-  onDone: () => void
+  onDone: (profile: Profile) => void
 }
 
 export default function Onboarding({ userId, dob, initial, onDone }: Props) {
@@ -107,7 +107,7 @@ export default function Onboarding({ userId, dob, initial, onDone }: Props) {
         updatedAt: Date.now(),
       }
       await saveProfile(profile)
-      onDone()
+      onDone(profile)
     } catch (e) {
       setError('Save failed: ' + (e as Error).message)
     } finally {
@@ -187,7 +187,7 @@ export default function Onboarding({ userId, dob, initial, onDone }: Props) {
           onChange={(e) => setDisplayName(e.target.value)}
           maxLength={40}
           placeholder="What should we call you?"
-          className="w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-base"
+          className="w-full rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4 py-3 text-base"
         />
       </Section>
 
@@ -206,7 +206,7 @@ export default function Onboarding({ userId, dob, initial, onDone }: Props) {
           maxLength={300}
           rows={4}
           placeholder="A line or two about you."
-          className="w-full rounded-xl border border-[var(--line)] bg-white px-4 py-3 text-base resize-none"
+          className="w-full rounded-xl border border-[var(--line)] bg-[var(--paper)] px-4 py-3 text-base resize-none"
         />
         <p className="text-xs text-[var(--muted)] mt-1 text-right">{bio.length}/300</p>
       </Section>
@@ -282,7 +282,7 @@ function Pills<T extends string>({
           className={`px-4 py-2 rounded-full border text-sm font-medium transition ${
             value === o.value
               ? 'bg-[var(--ink)] text-[var(--paper)] border-[var(--ink)]'
-              : 'bg-white text-[var(--ink)] border-[var(--line)]'
+              : 'bg-[var(--paper)] text-[var(--ink)] border-[var(--line)]'
           }`}
         >
           {o.label}

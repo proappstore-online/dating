@@ -66,17 +66,17 @@ export default function Discover({ me, epoch, onMatched, onNavigate }: Props) {
 
   if (loading) {
     return (
-      <div className="relative h-full w-full flex flex-col">
-        <div className="relative flex-1 flex items-center justify-center px-4 pb-4">
+      <DiscoverScreen>
+        <div className="relative min-h-48 flex-1 flex items-center justify-center px-4 pb-4">
           <div className="absolute inset-4 rounded-3xl bg-[var(--accent-soft)] animate-pulse" />
           <div className="absolute inset-4 rounded-3xl bg-gradient-to-t from-black/10 via-transparent to-transparent" />
           <p className="relative text-sm text-[var(--muted)]">Looking around…</p>
         </div>
-        <div className="flex justify-center gap-6 pb-6">
+        <div className="flex shrink-0 justify-center gap-6 pb-6">
           <div className="w-16 h-16 rounded-full bg-[var(--accent-soft)] animate-pulse" />
           <div className="w-16 h-16 rounded-full bg-[var(--accent-soft)] animate-pulse" />
         </div>
-      </div>
+      </DiscoverScreen>
     )
   }
   if (error) {
@@ -114,11 +114,11 @@ export default function Discover({ me, epoch, onMatched, onNavigate }: Props) {
   const next = stack[stack.length - 2]
 
   return (
-    <div className="relative h-full w-full flex flex-col">
+    <DiscoverScreen>
       {admirerCount > 0 && (
         <button
           onClick={() => onNavigate({ name: 'admirers' })}
-          className="mx-4 mt-3 rounded-2xl bg-[var(--accent)] text-white px-4 py-3 flex items-center gap-3 active:opacity-90 transition"
+          className="mx-4 mt-3 shrink-0 rounded-2xl bg-[var(--accent)] text-white px-4 py-3 flex items-center gap-3 active:opacity-90 transition"
         >
           <span className="text-2xl">&#10084;</span>
           <span className="font-semibold text-left flex-1">
@@ -127,16 +127,16 @@ export default function Discover({ me, epoch, onMatched, onNavigate }: Props) {
           <span className="text-xl opacity-80">&rsaquo;</span>
         </button>
       )}
-      <div className="relative flex-1 flex items-center justify-center px-4 pb-4">
+      <div className="relative min-h-48 flex-1 flex items-center justify-center px-4 pb-4">
         {next && <Card key={next.userId} profile={next} isTop={false} onDecide={() => {}} />}
         {top && <Card key={top.userId} profile={top} isTop={true} onDecide={(d) => handleSwipe(top, d)} />}
       </div>
-      <div className="flex justify-center gap-6 pb-6">
+      <div className="flex shrink-0 justify-center gap-6 pb-6">
         <ActionButton onClick={() => top && handleSwipe(top, 'left')} variant="nope">&times;</ActionButton>
         <ActionButton onClick={() => top && handleSwipe(top, 'right')} variant="yes">&#10084;</ActionButton>
       </div>
       {matched && <MatchOverlay me={me} other={matched} onClose={() => setMatched(null)} />}
-    </div>
+    </DiscoverScreen>
   )
 }
 
@@ -250,7 +250,7 @@ function Card({
 
       <div className="absolute inset-x-0 bottom-0 p-5 pt-16 bg-gradient-to-t from-black/80 via-black/30 to-transparent text-white">
         <div className="flex items-baseline gap-2">
-          <h2 className="text-2xl font-bold display-font">{profile.displayName}</h2>
+          <h2 className="min-w-0 break-words text-2xl font-bold display-font">{profile.displayName}</h2>
           {age != null && <span className="text-2xl font-light opacity-90">{age}</span>}
         </div>
         {profile.distanceKm != null && (
@@ -290,21 +290,38 @@ function ActionButton({
 }) {
   const color = variant === 'yes' ? 'text-[var(--accent)]' : 'text-[var(--ink)]'
   return (
-    <button
-      aria-label={variant === 'yes' ? 'Like profile' : 'Pass profile'}
-      onClick={onClick}
-      className={`w-16 h-16 rounded-full bg-white shadow-lg flex items-center justify-center text-3xl active:scale-90 transition ${color}`}
-    >
+    <div className="flex flex-col items-center gap-2">
+      <button
+        aria-label={variant === 'yes' ? 'Like profile' : 'Pass profile'}
+        onClick={onClick}
+        className={`w-16 h-16 rounded-full bg-[var(--paper)] border border-[var(--line)] shadow-lg flex items-center justify-center text-3xl active:scale-90 transition ${color}`}
+      >
+        {children}
+      </button>
+      <span className="text-xs font-medium text-[var(--muted)]">{variant === 'yes' ? 'Like' : 'Pass'}</span>
+    </div>
+  )
+}
+
+function DiscoverScreen({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="relative min-h-full w-full flex flex-col">
+      <header className="px-5 pt-5 pb-1 shrink-0">
+        <h1 className="display-font text-3xl">Discover</h1>
+        <p className="text-xs text-[var(--muted)] mt-1">Swipe or tap to find your next hello.</p>
+      </header>
       {children}
-    </button>
+    </div>
   )
 }
 
 function CenteredMessage({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
-      {children}
-    </div>
+    <DiscoverScreen>
+      <div className="flex-1 flex flex-col items-center justify-center text-center px-6 py-8">
+        {children}
+      </div>
+    </DiscoverScreen>
   )
 }
 

@@ -100,7 +100,7 @@ export default function SafetyMenu({ meId, otherId, aId, bId, otherName, onClose
                   className={`px-3 py-1.5 rounded-full text-sm border ${
                     reason === r
                       ? 'bg-[var(--ink)] text-[var(--paper)] border-[var(--ink)]'
-                      : 'bg-white text-[var(--ink)] border-[var(--line)]'
+                      : 'bg-[var(--paper)] text-[var(--ink)] border-[var(--line)]'
                   }`}
                 >
                   {reasonLabel(r)}
@@ -114,7 +114,7 @@ export default function SafetyMenu({ meId, otherId, aId, bId, otherName, onClose
               placeholder="Optional context"
               maxLength={500}
               rows={3}
-              className="w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2 text-sm resize-none mb-3"
+              className="w-full rounded-xl border border-[var(--line)] bg-[var(--paper)] px-3 py-2 text-sm resize-none mb-3"
             />
             {error && <p className="text-[var(--error)] text-sm mb-2">{error}</p>}
             <div className="flex gap-2">
