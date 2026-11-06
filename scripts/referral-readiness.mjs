@@ -20,4 +20,6 @@ try {
   run('pnpm', ['--filter', '@proappstore/backend', 'prebuild']);
   run('pnpm', ['exec', 'playwright', 'install', '--with-deps', 'chromium', 'webkit']);
   run(process.execPath, ['scripts/test-referral-browser.mjs'], platform, { ...process.env, PAS_REFERRAL_APP: 'dating', PAS_REFERRAL_DIST: dist, PAS_REFERRAL_ARTIFACTS: join(root, 'artifacts/referral-readiness') });
+  console.log('Verified with platform revision ' + revision);
+  console.log(readFileSync(join(root, 'artifacts/referral-readiness/results.json'), 'utf8'));
 } finally { rmSync(temp, { recursive: true, force: true }); }
